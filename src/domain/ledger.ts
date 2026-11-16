@@ -1,0 +1,1108 @@
+import { randomUUID } from './id';
+
+export const kinds = {
+  expense: 'Expense',
+  income: 'Income',
+  transfer: 'Transfer',
+  investment_contribution: 'Investment contribution',
+  investment_withdrawal: 'Investment withdrawal',
+} as const;
+
+export type Kind = keyof typeof kinds;
+export const currencies = {
+  IDR: 'Indonesian rupiah',
+  USD: 'US dollar',
+  SGD: 'Singapore dollar',
+  EUR: 'Euro',
+  GBP: 'British pound',
+  AUD: 'Australian dollar',
+  CAD: 'Canadian dollar',
+  CNY: 'Chinese yuan',
+  HKD: 'Hong Kong dollar',
+  INR: 'Indian rupee',
+  JPY: 'Japanese yen',
+  KRW: 'South Korean won',
+  MYR: 'Malaysian ringgit',
+  NZD: 'New Zealand dollar',
+  PHP: 'Philippine peso',
+  THB: 'Thai baht',
+  VND: 'Vietnamese dong',
+  AED: 'UAE dirham',
+  CHF: 'Swiss franc',
+  KWD: 'Kuwaiti dinar',
+} as const;
+export type Currency = keyof typeof currencies;
+export const defaultCurrency: Currency = 'IDR';
+export const isCurrency = (value: string): value is Currency => Object.hasOwn(currencies, value);
+const minorDigits = (currency: Currency) =>
+  currency === 'KWD' ? 3 : ['JPY', 'KRW', 'VND'].includes(currency) ? 0 : 2;
+export const currencyLabel = (currency: Currency) => (currency === 'IDR' ? 'Rp' : currency);
+export const amountExample = (currency: Currency) =>
+  currency === 'IDR' ? '125.000,50' : minorDigits(currency) === 0 ? '125,000' : '125.50';
+export const majorAmount = (amount: number, currency: Currency) =>
+  amount / 10 ** minorDigits(currency);
+export type AccountKind = 'bank' | 'wallet' | 'cash' | 'investment';
+export type FieldType = 'text' | 'number' | 'date' | 'select' | 'checkbox';
+export type FieldValue = string | number | boolean;
+// Saved demo accounts from before currency support use IDR.
+export type FinanceBook = { id: string; name: string };
+type BookRecord = { ledger_id?: string | null };
+export type ReimbursementPerson = BookRecord & { id: string; name: string; archived: boolean };
+export type SavingsGoal = BookRecord & {
+  id: string;
+  name: string;
+  currency: Currency;
+  target_minor: number;
+  reserved_minor: number;
+  target_on: string | null;
+};
+export type Account = BookRecord & {
+  id: string;
+  name: string;
+  kind: AccountKind;
+  currency?: Currency;
+  opening_minor: number;
+  opening_date: string;
+  archived: boolean;
+};
+export type Category = BookRecord & {
+  id: string;
+  name: string;
+  applicable_kind: 'income' | 'expense';
+  color: string;
+  archived: boolean;
+};
+export type Field = BookRecord & {
+  id: string;
+  label: string;
+  field_type: FieldType;
+  options: string[];
+  required: boolean;
+  position: number;
+  archived: boolean;
+};
+export type ReimbursementShare = {
+  id: string;
+  amount_minor: number;
+  counterparty: string;
+  due_on: string | null;
+};
+export type ReimbursementDraft = Omit<ReimbursementShare, 'amount_minor'> & { amount: string };
+export type Entry = {
+  id: string;
+  occurred_on: string;
+  kind: Kind;
+  description: string;
+  amount_minor: number;
+  account_id: string;
+  destination_account_id: string | null;
+  category_id: string | null;
+  notes: string;
+  custom_values: Record<string, FieldValue>;
+  reimbursable_minor: number;
+  counterparty: string;
+  due_on: string | null;
+  reimbursement_claims?: ReimbursementShare[] | null;
+};
+export type Receipt = {
+  id: string;
+  expense_id: string;
+  claim_id?: string | null;
+  income_entry_id?: string | null;
+  payment_group_id?: string | null;
+  account_id: string;
+  received_on: string;
+  amount_minor: number;
+  notes: string;
+};
+export type Valuation = {
+  id: string;
+  investment_account_id: string;
+  valued_on: string;
+  value_minor: number;
+};
+export type BalanceUpdate = {
+  id: string;
+  account_id: string;
+  recorded_on: string;
+  frequency: 'weekly' | 'monthly';
+  balance_minor: number;
+};
+export type Workspace = {
+  finance_books: FinanceBook[];
+  reimbursement_people: ReimbursementPerson[];
+  savings_goals: SavingsGoal[];
+  accounts: Account[];
+  categories: Category[];
+  field_definitions: Field[];
+  transactions: Entry[];
+  reimbursement_receipts: Receipt[];
+  investment_valuations: Valuation[];
+  balance_updates: BalanceUpdate[];
+};
+export type Collection = keyof Workspace;
+export type EntryDraft = Omit<
+  Entry,
+  'amount_minor' | 'reimbursable_minor' | 'reimbursement_claims' | 'custom_values' | 'kind'
+> & {
+  amount: string;
+  reimbursable: string;
+  custom: Record<string, string | boolean>;
+  kind: string;
+  people?: ReimbursementDraft[];
+};
+
+export const emptyWorkspace: Workspace = {
+  finance_books: [],
+  reimbursement_people: [],
+  savings_goals: [],
+  accounts: [],
+  categories: [],
+  field_definitions: [],
+  transactions: [],
+  reimbursement_receipts: [],
+  investment_valuations: [],
+  balance_updates: [],
+};
+const jakarta = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const rupiah = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+const otherCurrency = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+export const today = () => jakarta.format(new Date());
+function formattedAmount(amount: number, currency: Currency) {
+  const decimals = minorDigits(currency);
+  const factor = 10 ** decimals;
+  const absolute = Math.abs(amount);
+  const fraction = absolute % factor;
+  const whole = (currency === 'IDR' ? rupiah : otherCurrency).format(
+    (absolute - fraction) / factor,
+  );
+  if (currency === 'IDR')
+    return whole + (fraction ? ',' + String(fraction).padStart(2, '0').replace(/0$/, '') : '');
+  return whole + (decimals ? '.' + String(fraction).padStart(decimals, '0') : '');
+}
+export const money = (amount: number, currency: Currency = defaultCurrency) =>
+  (amount < 0 ? '−' : '') + currencyLabel(currency) + '\u00a0' + formattedAmount(amount, currency);
+export const amountText = (amount: number, currency: Currency = defaultCurrency) =>
+  amount ? (amount < 0 ? '-' : '') + formattedAmount(amount, currency) : '';
+export function signed(amount: number, currency: Currency = defaultCurrency) {
+  return (amount < 0 ? '−' : amount > 0 ? '+' : '') + money(Math.abs(amount), currency);
+}
+const monthFormat = new Intl.DateTimeFormat('en', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+const dayFormat = new Intl.DateTimeFormat('en', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+export const monthLabel = (month: string) => monthFormat.format(new Date(month + '-01T00:00:00Z'));
+export const periodLabel = (period: string) =>
+  period === 'all' ? 'All time' : period.length === 4 ? period : monthLabel(period);
+export const inPeriod = (date: string, period: string) =>
+  period === 'all' || date.startsWith(period);
+export const periodStart = (period: string) =>
+  period === 'all' ? '0000-01-01' : period.length === 4 ? period + '-01-01' : period + '-01';
+const periodEnd = (period: string) =>
+  period === 'all'
+    ? '9999-99-99'
+    : period.length === 4
+      ? Number(period) + 1 + '-01-01'
+      : shiftMonth(period, 1) + '-01';
+export const dayLabel = (day: string) => dayFormat.format(new Date(day + 'T00:00:00Z'));
+export function shiftMonth(month: string, delta: number) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Date(Date.UTC(year, monthNumber - 1 + delta, 1)).toISOString().slice(0, 7);
+}
+export function parseDate(input: string): string | null {
+  const clean = input.trim();
+  const slash = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(clean);
+  const date = slash
+    ? slash[3] + '-' + slash[2].padStart(2, '0') + '-' + slash[1].padStart(2, '0')
+    : clean;
+  if (!/^(?:19|20|21)\d{2}-\d{2}-\d{2}$/.test(date)) return null;
+  const value = new Date(date + 'T00:00:00Z');
+  return !Number.isNaN(+value) && value.toISOString().slice(0, 10) === date ? date : null;
+}
+export function parseMoney(input: string, currency: Currency = defaultCurrency): number | null {
+  let clean = input
+    .trim()
+    .replace(new RegExp('^' + (currency === 'IDR' ? '(?:Rp|IDR)' : currency) + '\\s*', 'i'), '');
+  const decimals = minorDigits(currency);
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(clean)) clean = clean.replace(/,/g, '');
+  else if (currency === 'IDR') {
+    if (/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(clean)) clean = clean.replace(/\./g, '');
+    clean = clean.replace(',', '.');
+  }
+  if (!(decimals ? new RegExp('^\\d+(?:\\.\\d{1,' + decimals + '})?$') : /^\d+$/).test(clean))
+    return null;
+  const [whole, fraction = ''] = clean.split('.');
+  const digits = (whole + fraction.padEnd(decimals, '0')).replace(/^0+(?=\d)/, '');
+  if (digits.length > 16) return null;
+  const value = BigInt(digits);
+  return value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+}
+export function formatMoneyInput(input: string, currency: Currency) {
+  const amount = parseMoney(input, currency);
+  if (amount === null) return input;
+  const digits = minorDigits(currency);
+  const minor = String(amount).padStart(digits + 1, '0');
+  return groupNumber(digits ? minor.slice(0, -digits) + '.' + minor.slice(-digits) : minor);
+}
+function normalizedNumber(input: string) {
+  return /^-?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(input)
+    ? input.replace(/,/g, '')
+    : input.replace(',', '.');
+}
+export function groupNumber(input: string) {
+  const plain = normalizedNumber(input.trim());
+  return /^-?\d+(?:\.\d+)?$/.test(plain)
+    ? plain.replace(
+        /^(-?)(\d+)/,
+        (_, sign, whole) => sign + whole.replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+      )
+    : input;
+}
+export const newId = () => randomUUID();
+export const accountName = (workspace: Workspace, id: string) =>
+  workspace.accounts.find((account) => account.id === id)?.name ?? 'Unknown account';
+export const accountCurrency = (account?: Account): Currency =>
+  account?.currency ?? defaultCurrency;
+export const currencyForAccount = (workspace: Workspace, id: string) =>
+  accountCurrency(workspace.accounts.find((account) => account.id === id));
+function workspaceWithAccounts(workspace: Workspace, accounts: Account[]): Workspace {
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const transactions = workspace.transactions.filter((entry) => accountIds.has(entry.account_id));
+  const entryIds = new Set(transactions.map((entry) => entry.id));
+  return {
+    ...workspace,
+    accounts,
+    transactions,
+    reimbursement_receipts: workspace.reimbursement_receipts.filter(
+      (receipt) => accountIds.has(receipt.account_id) && entryIds.has(receipt.expense_id),
+    ),
+    investment_valuations: workspace.investment_valuations.filter((row) =>
+      accountIds.has(row.investment_account_id),
+    ),
+    balance_updates: workspace.balance_updates.filter((row) => accountIds.has(row.account_id)),
+  };
+}
+export function workspaceForCurrency(workspace: Workspace, currency: Currency): Workspace {
+  return workspaceWithAccounts(
+    workspace,
+    workspace.accounts.filter((account) => accountCurrency(account) === currency),
+  );
+}
+export function workspaceForBook(workspace: Workspace, bookId: string): Workspace {
+  const inBook = (row: BookRecord) => (row.ledger_id ?? '') === bookId;
+  return workspaceWithAccounts(
+    {
+      ...workspace,
+      savings_goals: workspace.savings_goals.filter(inBook),
+      reimbursement_people: workspace.reimbursement_people.filter(inBook),
+      categories: workspace.categories.filter(inBook),
+      field_definitions: workspace.field_definitions.filter(inBook),
+    },
+    workspace.accounts.filter(inBook),
+  );
+}
+export function withoutFinanceSheet(workspace: Workspace, bookId: string): Workspace {
+  if (!bookId || !workspace.finance_books.some((book) => book.id === bookId)) return workspace;
+  const keep = (row: BookRecord) => row.ledger_id !== bookId;
+  const accountIds = new Set(
+    workspace.accounts.filter((account) => !keep(account)).map((account) => account.id),
+  );
+  return {
+    ...workspace,
+    finance_books: workspace.finance_books.filter((book) => book.id !== bookId),
+    accounts: workspace.accounts.filter(keep),
+    categories: workspace.categories.filter(keep),
+    field_definitions: workspace.field_definitions.filter(keep),
+    savings_goals: workspace.savings_goals.filter(keep),
+    reimbursement_people: workspace.reimbursement_people.filter(keep),
+    transactions: workspace.transactions.filter((row) => !accountIds.has(row.account_id)),
+    reimbursement_receipts: workspace.reimbursement_receipts.filter(
+      (row) => !accountIds.has(row.account_id),
+    ),
+    investment_valuations: workspace.investment_valuations.filter(
+      (row) => !accountIds.has(row.investment_account_id),
+    ),
+    balance_updates: workspace.balance_updates.filter((row) => !accountIds.has(row.account_id)),
+  };
+}
+export const categoryName = (workspace: Workspace, id: string | null) =>
+  workspace.categories.find((category) => category.id === id)?.name ?? 'Uncategorized';
+export const needsDestination = (kind: string) =>
+  kind === 'transfer' || kind.startsWith('investment_');
+export const editableAccounts = (
+  workspace: Workspace,
+  kind: string,
+  destination = false,
+  currentId?: string | null,
+) =>
+  workspace.accounts.filter((account) => {
+    const investment = destination
+      ? kind === 'investment_contribution'
+      : kind === 'investment_withdrawal';
+    return (
+      (!account.archived || account.id === currentId) &&
+      (account.kind === 'investment') === investment
+    );
+  });
+export const activeFields = (workspace: Workspace) =>
+  workspace.field_definitions
+    .filter((field) => !field.archived)
+    .toSorted((a, b) => a.position - b.position);
+
+export function historicalAccounts(
+  workspace: Workspace,
+  draft: Pick<EntryDraft, 'occurred_on' | 'account_id' | 'destination_account_id' | 'kind'>,
+) {
+  const date = parseDate(draft.occurred_on);
+  return date
+    ? workspace.accounts.filter(
+        (account) =>
+          date < account.opening_date &&
+          (account.id === draft.account_id ||
+            (needsDestination(draft.kind) && account.id === draft.destination_account_id)),
+      )
+    : [];
+}
+
+export function blankDraft(
+  workspace: Workspace,
+  month: string,
+  kind: Kind = 'expense',
+  preset?: string,
+): EntryDraft {
+  const date = today();
+  const accountId = kind === 'investment_withdrawal' ? preset : undefined;
+  const destination = kind === 'investment_contribution' ? (preset ?? null) : null;
+  return {
+    id: newId(),
+    kind,
+    occurred_on: date.startsWith(month) ? date : month + '-01',
+    description: '',
+    amount: '',
+    account_id: accountId ?? editableAccounts(workspace, kind)[0]?.id ?? '',
+    destination_account_id: destination,
+    category_id: null,
+    notes: '',
+    custom: {},
+    reimbursable: '',
+    counterparty: '',
+    due_on: null,
+  };
+}
+export function draftFrom(entry: Entry, currency: Currency = defaultCurrency): EntryDraft {
+  const { amount_minor, reimbursable_minor, reimbursement_claims, custom_values, ...rest } = entry;
+  return {
+    ...rest,
+    amount: amountText(amount_minor, currency),
+    reimbursable: amountText(reimbursable_minor, currency),
+    people: reimbursement_claims?.map(({ amount_minor, ...person }) => ({
+      ...person,
+      amount: amountText(amount_minor, currency),
+    })),
+    custom: Object.fromEntries(
+      Object.entries(custom_values).map(([key, value]) => [
+        key,
+        typeof value === 'number' ? String(value) : value,
+      ]),
+    ),
+  };
+}
+type Validation =
+  { entry: Entry; errors?: undefined } | { entry?: undefined; errors: Record<string, string> };
+export type ReimbursementMode = 'none' | 'partial' | 'full' | 'split';
+export const fullReimbursement = 'Full';
+export const maxReimbursementPeople = 30;
+
+export function validateSpreadsheetEntry(workspace: Workspace, draft: EntryDraft): Validation {
+  const result = validateEntry(workspace, draft, { requireCustomFields: false });
+  const errors = { ...result.errors };
+  if (draft.kind === 'expense' && !draft.people) {
+    const person = draft.counterparty.trim();
+    const claim = draft.reimbursable.trim();
+    if (
+      (person || draft.due_on?.trim()) &&
+      (!claim || parseMoney(claim, currencyForAccount(workspace, draft.account_id)) === 0)
+    ) {
+      errors.reimbursable = 'Enter a positive reimbursement amount or clear Owed by and Due date.';
+    }
+    if (person.length > 160) errors.counterparty = 'Enter a name up to 160 characters.';
+  }
+  for (const field of activeFields(workspace)) {
+    const value = draft.custom[field.id];
+    if (field.field_type === 'checkbox' && typeof value === 'string' && value.trim()) {
+      errors[field.id] = 'Choose Yes or No.';
+    }
+  }
+  return Object.keys(errors).length ? { errors } : result;
+}
+
+export function validateFormEntry(
+  workspace: Workspace,
+  draft: EntryDraft,
+  mode: ReimbursementMode,
+): Validation {
+  if (draft.kind === 'expense' && mode === 'split')
+    return validateEntry(workspace, { ...draft, people: draft.people ?? [] });
+  draft = { ...draft, people: undefined };
+  if (draft.kind !== 'expense' || mode === 'none') {
+    return validateEntry(workspace, { ...draft, reimbursable: '', counterparty: '', due_on: null });
+  }
+  if (mode === 'full') return validateEntry(workspace, { ...draft, reimbursable: draft.amount });
+  const result = validateEntry(workspace, draft);
+  const currency = currencyForAccount(workspace, draft.account_id);
+  const amount = parseMoney(draft.amount, currency);
+  const claim = parseMoney(draft.reimbursable, currency);
+  if (
+    !draft.reimbursable.trim() ||
+    claim === 0 ||
+    (claim !== null && amount !== null && claim === amount)
+  ) {
+    return {
+      errors: {
+        ...result.errors,
+        reimbursable: 'Enter an amount greater than zero and less than the expense.',
+      },
+    };
+  }
+  return result;
+}
+
+export function validateEntry(
+  workspace: Workspace,
+  draft: EntryDraft,
+  { requireCustomFields = true } = {},
+): Validation {
+  const errors: Record<string, string> = {};
+  const existing = workspace.transactions.find((entry) => entry.id === draft.id);
+  const kind = Object.hasOwn(kinds, draft.kind) ? (draft.kind as Kind) : null;
+  const date = parseDate(draft.occurred_on);
+  const sourceAccount = editableAccounts(workspace, draft.kind, false, existing?.account_id).find(
+    (item) => item.id === draft.account_id,
+  );
+  const currency = accountCurrency(sourceAccount);
+  const amount = parseMoney(draft.amount, currency);
+  const description = draft.description.trim();
+  const shares =
+    kind === 'expense'
+      ? draft.people?.map((person) => {
+          const amount = parseMoney(person.amount, currency);
+          const counterparty = person.counterparty.trim();
+          const due = person.due_on ? parseDate(person.due_on) : null;
+          if (!amount) errors[person.id + '-amount'] = 'Enter a positive amount.';
+          if (!counterparty || counterparty.length > 160)
+            errors[person.id + '-person'] = 'Enter a name up to 160 characters.';
+          if (person.due_on && (!due || (date && due < date)))
+            errors[person.id + '-date'] = 'Choose a due date on or after the expense date.';
+          return { id: person.id, amount_minor: amount ?? 0, counterparty, due_on: due };
+        })
+      : undefined;
+  const reimbursementText = draft.reimbursable.trim();
+  const reimbursable = shares
+    ? total(shares, (share) => share.amount_minor)
+    : kind === 'expense' && reimbursementText
+      ? reimbursementText.toLowerCase() === fullReimbursement.toLowerCase()
+        ? amount
+        : parseMoney(reimbursementText, currency)
+      : 0;
+  const destination = needsDestination(draft.kind) ? draft.destination_account_id : null;
+  const dueText = draft.due_on?.trim() ?? '';
+  const due = shares
+    ? shares.length === 1
+      ? shares[0].due_on
+      : null
+    : reimbursable && dueText
+      ? parseDate(dueText)
+      : null;
+  const counterparty = shares
+    ? shares.length === 1
+      ? shares[0].counterparty
+      : 'Multiple people'
+    : reimbursable
+      ? draft.counterparty.trim()
+      : '';
+  const category = kind === 'income' || kind === 'expense' ? draft.category_id : null;
+  if (!kind) errors.kind = 'Choose a valid type.';
+  if (!date) errors.occurred_on = 'Enter a valid date (YYYY-MM-DD or DD/MM/YYYY).';
+  if (!description || description.length > 160)
+    errors.description = 'Enter a description up to 160 characters.';
+  if (!amount) errors.amount = 'Enter a positive amount, such as ' + amountExample(currency) + '.';
+  const targetAccount = editableAccounts(
+    workspace,
+    draft.kind,
+    true,
+    existing?.destination_account_id,
+  ).find((item) => item.id === destination);
+  if (!sourceAccount) errors.account_id = 'Choose a valid account.';
+  else if (existing && currencyForAccount(workspace, existing.account_id) !== currency)
+    errors.account_id = 'Keep the entry in its original currency.';
+  else if (
+    existing &&
+    (workspace.accounts.find((account) => account.id === existing.account_id)?.ledger_id ??
+      null) !== (sourceAccount.ledger_id ?? null)
+  )
+    errors.account_id = 'Keep the entry in its original sheet.';
+  if (needsDestination(draft.kind)) {
+    if (!targetAccount || destination === draft.account_id)
+      errors.destination_account_id = 'Choose a different destination account.';
+    else if (accountCurrency(targetAccount) !== currency)
+      errors.destination_account_id = 'Choose a destination in the same currency.';
+    else if ((targetAccount.ledger_id ?? null) !== (sourceAccount?.ledger_id ?? null))
+      errors.destination_account_id = 'Choose a destination in the same sheet.';
+  }
+  if (
+    category &&
+    !workspace.categories.some(
+      (item) =>
+        item.id === category &&
+        item.applicable_kind === kind &&
+        (item.ledger_id ?? null) === (sourceAccount?.ledger_id ?? null) &&
+        (!item.archived || existing?.category_id === item.id),
+    )
+  )
+    errors.category_id = 'Choose a category that matches this type and sheet.';
+  if (reimbursable === null || reimbursable > (amount ?? 0))
+    errors.reimbursable = 'The claim must be between zero and the expense amount.';
+  if (reimbursable && !counterparty) errors.counterparty = 'Enter who owes this reimbursement.';
+  if (!shares && reimbursable && dueText && (!due || (date && due < date)))
+    errors.due_on = 'Choose a due date on or after the expense date.';
+  if (
+    shares &&
+    (!shares.length ||
+      shares.length > maxReimbursementPeople ||
+      new Set(shares.map((share) => share.id)).size !== shares.length)
+  ) {
+    errors.reimbursable = 'Add between 1 and ' + maxReimbursementPeople + ' reimbursement shares.';
+  }
+  const receipts = workspace.reimbursement_receipts.filter(
+    (receipt) => receipt.expense_id === draft.id,
+  );
+  const limits = new Map(
+    shares?.map((share) => [share.id, share.amount_minor]) ?? [[draft.id, reimbursable ?? 0]],
+  );
+  for (const [id, payments] of Map.groupBy(receipts, (receipt) => receipt.claim_id ?? draft.id)) {
+    if ((limits.get(id) ?? 0) < total(payments, (row) => row.amount_minor)) {
+      errors.reimbursable =
+        'Keep each paid share and its received amount, or remove its payments first.';
+    }
+  }
+  if (date && receipts.some((receipt) => receipt.received_on < date))
+    errors.occurred_on = 'The expense cannot move after a linked payment.';
+  const customValues = { ...existing?.custom_values };
+  for (const field of activeFields(workspace)) {
+    const raw = draft.custom[field.id];
+    const value = typeof raw === 'string' ? raw.trim() : raw;
+    if (field.field_type === 'checkbox') {
+      if (requireCustomFields && field.required && value !== true)
+        errors[field.id] = 'Select this checkbox.';
+      customValues[field.id] = value === true;
+    } else if (!value) {
+      if (requireCustomFields && field.required) errors[field.id] = 'Complete this field.';
+      delete customValues[field.id];
+    } else if (typeof value !== 'string') {
+      errors[field.id] = 'Enter a valid value.';
+    } else if (field.field_type === 'number') {
+      const plain = normalizedNumber(value);
+      const number = /^-?\d+(?:\.\d+)?$/.test(plain) ? Number(plain) : NaN;
+      if (!Number.isFinite(number)) errors[field.id] = 'Enter a number.';
+      else customValues[field.id] = number;
+    } else if (field.field_type === 'date') {
+      const normalized = parseDate(value);
+      if (!normalized) errors[field.id] = 'Enter a valid date.';
+      else customValues[field.id] = normalized;
+    } else if (
+      field.field_type === 'select' &&
+      !field.options.includes(value) &&
+      existing?.custom_values[field.id] !== value
+    ) {
+      errors[field.id] = 'Choose a listed option.';
+    } else {
+      customValues[field.id] = value;
+    }
+  }
+  if (Object.keys(errors).length || !kind || !date || !amount || reimbursable === null)
+    return { errors };
+  return {
+    entry: {
+      id: draft.id,
+      kind,
+      occurred_on: date,
+      description,
+      amount_minor: amount,
+      account_id: draft.account_id,
+      destination_account_id: destination,
+      category_id: category,
+      notes: draft.notes.trim(),
+      custom_values: customValues,
+      reimbursable_minor: reimbursable,
+      counterparty,
+      due_on: due,
+      reimbursement_claims: shares ?? null,
+    },
+  };
+}
+
+const total = <T>(rows: T[], value: (row: T) => number) =>
+  rows.reduce((sum, row) => sum + value(row), 0);
+export function entryClaims(entry: Entry): ReimbursementShare[] {
+  if (!entry.reimbursable_minor) return [];
+  return (
+    entry.reimbursement_claims ?? [
+      {
+        id: entry.id,
+        amount_minor: entry.reimbursable_minor,
+        counterparty: entry.counterparty,
+        due_on: entry.due_on,
+      },
+    ]
+  );
+}
+export const claimKey = (expenseId: string, claimId: string) => expenseId + ':' + claimId;
+export const paymentKey = (receipt: Receipt) => receipt.payment_group_id ?? receipt.id;
+export const receiptClaimKey = (receipt: Receipt) =>
+  claimKey(receipt.expense_id, receipt.claim_id ?? receipt.expense_id);
+const linkedIncomeIds = (workspace: Workspace) =>
+  new Set(workspace.reimbursement_receipts.map((receipt) => receipt.income_entry_id));
+
+export function claims(workspace: Workspace, before = '9999-99-99', asOf = today()) {
+  const receipts = new Map<string, Receipt[]>();
+  for (const receipt of workspace.reimbursement_receipts) {
+    if (receipt.received_on >= before) continue;
+    const key = receiptClaimKey(receipt);
+    const list = receipts.get(key) ?? [];
+    list.push(receipt);
+    receipts.set(key, list);
+  }
+  return workspace.transactions
+    .filter((entry) => entry.kind === 'expense' && entry.occurred_on < before)
+    .flatMap((entry) =>
+      entryClaims(entry).map((share) => {
+        const key = claimKey(entry.id, share.id);
+        const payments = (receipts.get(key) ?? []).toSorted((a, b) =>
+          b.received_on.localeCompare(a.received_on),
+        );
+        const paid = total(payments, (receipt) => receipt.amount_minor);
+        const remaining = share.amount_minor - paid;
+        const status = remaining === 0 ? 'Settled' : paid > 0 ? 'Partial' : 'Pending';
+        return {
+          ...share,
+          key,
+          entry,
+          receipts: payments,
+          paid,
+          remaining,
+          status,
+          overdue: !!(remaining && share.due_on && share.due_on < asOf),
+        };
+      }),
+    );
+}
+
+// The workspace is already scoped to the report's sheet and currency.
+export function reimbursementReport(
+  workspace: Workspace,
+  period: string,
+  selectedPeople: readonly string[] = [],
+) {
+  const before = periodEnd(period);
+  const relevant = claims(workspace, before, before < today() ? before : today()).filter(
+    (claim) =>
+      claim.remaining > 0 ||
+      inPeriod(claim.entry.occurred_on, period) ||
+      claim.receipts.some((receipt) => inPeriod(receipt.received_on, period)),
+  );
+  const people = [...new Set(relevant.map((claim) => claim.counterparty))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  const selected = new Set(selectedPeople);
+  const matching = selected.size
+    ? relevant.filter((claim) => selected.has(claim.counterparty))
+    : relevant;
+  const receipts: Receipt[] = [];
+  let opening = 0;
+  let newClaims = 0;
+  for (const claim of matching) {
+    const payments = claim.receipts.filter((receipt) => inPeriod(receipt.received_on, period));
+    receipts.push(...payments);
+    if (inPeriod(claim.entry.occurred_on, period)) newClaims += claim.amount_minor;
+    else opening += claim.remaining + total(payments, (receipt) => receipt.amount_minor);
+  }
+  return {
+    claims: matching,
+    people,
+    receipts,
+    opening,
+    newClaims,
+    collected: total(receipts, (receipt) => receipt.amount_minor),
+    outstanding: total(matching, (claim) => claim.remaining),
+  };
+}
+
+function balanceState(workspace: Workspace, before: string) {
+  const linked = linkedIncomeIds(workspace);
+  const openings = new Map(workspace.accounts.map((account) => [account.id, account.opening_date]));
+  const changes = new Map<string, Map<string, number>>();
+  const valuations = Map.groupBy(
+    workspace.investment_valuations.filter((row) => row.valued_on < before),
+    (row) => row.investment_account_id,
+  );
+  const updates = Map.groupBy(
+    workspace.balance_updates.filter((row) => row.recorded_on < before),
+    (row) => row.account_id,
+  );
+  const add = (id: string, date: string, delta: number) => {
+    const opening = openings.get(id);
+    if (!opening || date < opening) return;
+    const days = changes.get(id) ?? new Map<string, number>();
+    days.set(date, (days.get(date) ?? 0) + delta);
+    changes.set(id, days);
+  };
+  for (const entry of workspace.transactions) {
+    if (entry.occurred_on >= before || linked.has(entry.id)) continue;
+    add(
+      entry.account_id,
+      entry.occurred_on,
+      entry.kind === 'income' ? entry.amount_minor : -entry.amount_minor,
+    );
+    if (entry.destination_account_id)
+      add(entry.destination_account_id, entry.occurred_on, entry.amount_minor);
+  }
+  for (const receipt of workspace.reimbursement_receipts)
+    if (receipt.received_on < before)
+      add(receipt.account_id, receipt.received_on, receipt.amount_minor);
+  const adjustments: { update: BalanceUpdate; difference: number; investment: boolean }[] = [];
+  const accounts = workspace.accounts.map((account) => {
+    const movements = changes.get(account.id) ?? new Map<string, number>();
+    const manual = new Map(valuations.get(account.id)?.map((row) => [row.valued_on, row]));
+    const recorded = new Map(
+      updates
+        .get(account.id)
+        ?.filter((row) => row.recorded_on >= account.opening_date)
+        .map((row) => [row.recorded_on, row]),
+    );
+    const investment = account.kind === 'investment';
+    let value = account.opening_date < before ? account.opening_minor : 0;
+    let basis = value;
+    let valuation: Valuation | undefined;
+    const dates = [...new Set([...movements.keys(), ...manual.keys(), ...recorded.keys()])].sort();
+    for (const date of dates) {
+      const movement = movements.get(date) ?? 0;
+      basis += movement;
+      value += movement;
+      const manualValue = manual.get(date);
+      if (manualValue) {
+        valuation = manualValue;
+        value = manualValue.value_minor;
+      }
+      // An end-of-day balance includes activity and any valuation recorded on that date.
+      const update = recorded.get(date);
+      if (update) {
+        adjustments.push({ update, difference: update.balance_minor - value, investment });
+        value = update.balance_minor;
+        if (investment)
+          valuation = {
+            id: update.id,
+            investment_account_id: account.id,
+            valued_on: date,
+            value_minor: value,
+          };
+        else basis = value;
+      }
+    }
+    return { account, basis, valuation, value };
+  });
+  return { accounts, adjustments };
+}
+export function balances(workspace: Workspace, before: string) {
+  return balanceState(workspace, before).accounts;
+}
+export function balanceBeforeUpdate(workspace: Workspace, accountId: string, date: string) {
+  const nextDay = new Date(date + 'T00:00:00Z');
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  return (
+    balances(
+      {
+        ...workspace,
+        accounts: workspace.accounts.filter((account) => account.id === accountId),
+        balance_updates: workspace.balance_updates.filter(
+          (row) => row.account_id === accountId && row.recorded_on !== date,
+        ),
+      },
+      nextDay.toISOString().slice(0, 10),
+    )[0]?.value ?? 0
+  );
+}
+export function balanceUpdateTitle(
+  frequency: BalanceUpdate['frequency'],
+  difference: number,
+  investment: boolean,
+) {
+  const interval = frequency === 'weekly' ? 'Weekly ' : 'Monthly ';
+  if (!difference) return interval + 'Balance Check';
+  if (investment) return interval + (difference > 0 ? 'Investment Gain' : 'Investment Loss');
+  return interval + (difference > 0 ? 'Income' : 'Expense');
+}
+export function periodReport(
+  data: Workspace,
+  period: string,
+  currency: Currency = defaultCurrency,
+) {
+  const workspace = workspaceForCurrency(data, currency);
+  const before = periodEnd(period);
+  const { accounts, adjustments: allAdjustments } = balanceState(workspace, before);
+  const adjustments = allAdjustments.filter((row) => inPeriod(row.update.recorded_on, period));
+  const cashAdjustments = adjustments.filter((row) => !row.investment);
+  const adjustmentIncome = total(cashAdjustments, (row) => Math.max(0, row.difference));
+  const adjustmentExpense = total(cashAdjustments, (row) => Math.max(0, -row.difference));
+  const linked = linkedIncomeIds(workspace);
+  const entries = workspace.transactions
+    .filter((entry) => !linked.has(entry.id) && inPeriod(entry.occurred_on, period))
+    .toSorted((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+  const receipts = workspace.reimbursement_receipts.filter((row) =>
+    inPeriod(row.received_on, period),
+  );
+  const activeClaims = claims(workspace, before, before < today() ? before : today());
+  const expenses = entries.filter((entry) => entry.kind === 'expense');
+  const income =
+    adjustmentIncome +
+    total(
+      entries.filter((entry) => entry.kind === 'income'),
+      (row) => row.amount_minor,
+    );
+  const gross = adjustmentExpense + total(expenses, (row) => row.amount_minor);
+  const spending =
+    adjustmentExpense + total(expenses, (row) => row.amount_minor - row.reimbursable_minor);
+  const contribution = total(
+    entries.filter((entry) => entry.kind === 'investment_contribution'),
+    (row) => row.amount_minor,
+  );
+  const withdrawal = total(
+    entries.filter((entry) => entry.kind === 'investment_withdrawal'),
+    (row) => row.amount_minor,
+  );
+  const collected = total(receipts, (row) => row.amount_minor);
+  const cash = total(
+    accounts.filter((item) => item.account.kind !== 'investment'),
+    (row) => row.value,
+  );
+  const invested = total(
+    accounts.filter((item) => item.account.kind === 'investment'),
+    (row) => row.value,
+  );
+  const receivable = total(activeClaims, (row) => row.remaining);
+  const categoryTotals = new Map<string | null, number>();
+  for (const entry of expenses)
+    categoryTotals.set(
+      entry.category_id,
+      (categoryTotals.get(entry.category_id) ?? 0) + entry.amount_minor - entry.reimbursable_minor,
+    );
+  if (adjustmentExpense)
+    categoryTotals.set(null, (categoryTotals.get(null) ?? 0) + adjustmentExpense);
+  const categories = Array.from(categoryTotals, ([id, amount]) => ({
+    id,
+    name: categoryName(workspace, id),
+    amount,
+  }))
+    .filter((category) => category.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+  return {
+    entries,
+    receipts,
+    adjustments,
+    income,
+    gross,
+    spending,
+    contribution,
+    withdrawal,
+    collected,
+    cash,
+    invested,
+    receivable,
+    categories,
+    cashIn: income + collected + withdrawal,
+    cashOut: gross + contribution,
+    netCashFlow: income + collected + withdrawal - gross - contribution,
+    totalAssets: cash + invested + receivable,
+    accounts,
+    claims: activeClaims,
+  };
+}
+export function overviewHistory(
+  workspace: Workspace,
+  period: string,
+  currency: Currency,
+  currentMonth = today().slice(0, 7),
+) {
+  const end =
+    period === 'all'
+      ? currentMonth
+      : period.length === 4
+        ? period === currentMonth.slice(0, 4)
+          ? currentMonth
+          : period + '-12'
+        : period;
+  const count = period.length === 4 ? Number(end.slice(5)) : period === 'all' ? 12 : 6;
+  const scope = workspaceForCurrency(workspace, currency);
+  return Array.from({ length: count }, (_, index) => {
+    const month = shiftMonth(end, index - count + 1);
+    const report = periodReport(scope, month, currency);
+    return { month, wealth: report.totalAssets, income: report.income, expenses: report.gross };
+  });
+}
+export const monthly = periodReport;
+
+export type Activity = {
+  id: string;
+  date: string;
+  title: string;
+  kind: Kind | 'reimbursement_receipt' | 'balance_update';
+  amount: number;
+  accountId: string;
+  category: string;
+  entry?: Entry;
+  receipt?: Receipt;
+  balanceUpdate?: BalanceUpdate;
+};
+export function activity(
+  workspace: Workspace,
+  period: string,
+  currency: Currency = defaultCurrency,
+): Activity[] {
+  const report = periodReport(workspace, period, currency);
+  return [
+    ...report.entries.map((entry) => ({
+      id: entry.id,
+      date: entry.occurred_on,
+      title: entry.description,
+      kind: entry.kind,
+      amount:
+        entry.kind === 'income' || entry.kind === 'investment_withdrawal'
+          ? entry.amount_minor
+          : entry.kind === 'transfer'
+            ? entry.amount_minor
+            : -entry.amount_minor,
+      accountId: entry.account_id,
+      category: entry.category_id ? categoryName(workspace, entry.category_id) : kinds[entry.kind],
+      entry,
+    })),
+    ...report.adjustments.map(({ update, difference, investment }): Activity => ({
+      id: update.id,
+      date: update.recorded_on,
+      title: balanceUpdateTitle(update.frequency, difference, investment),
+      kind: investment || !difference ? 'balance_update' : difference > 0 ? 'income' : 'expense',
+      amount: difference,
+      accountId: update.account_id,
+      category: 'Balance update',
+      balanceUpdate: update,
+    })),
+    ...Array.from(Map.groupBy(report.receipts, paymentKey), ([id, payments]) => {
+      const receipt = payments.find((item) => item.id === id) ?? payments[0];
+      if (payments.length > 1)
+        return {
+          id,
+          date: receipt.received_on,
+          title: 'Reimbursement payment',
+          kind: 'reimbursement_receipt' as const,
+          amount: total(payments, (item) => item.amount_minor),
+          accountId: receipt.account_id,
+          category: payments.length + ' claims',
+          receipt,
+        };
+      const expense = workspace.transactions.find((entry) => entry.id === receipt.expense_id);
+      const person =
+        expense &&
+        entryClaims(expense).find((share) => share.id === (receipt.claim_id ?? expense.id));
+      return {
+        id: receipt.id,
+        date: receipt.received_on,
+        title: expense?.description ?? 'Reimbursement',
+        kind: 'reimbursement_receipt' as const,
+        amount: receipt.amount_minor,
+        accountId: receipt.account_id,
+        category: person
+          ? 'Reimbursement received · ' + person.counterparty
+          : 'Reimbursement received',
+        receipt,
+      };
+    }),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+}
+export const activityLabel = (row: Activity) =>
+  row.balanceUpdate || row.kind === 'balance_update'
+    ? 'Balance update'
+    : row.kind === 'reimbursement_receipt'
+      ? 'Reimbursement received'
+      : kinds[row.kind];
+export const activityMoney = (row: Activity, currency: Currency = defaultCurrency) =>
+  row.kind === 'transfer' ? money(row.amount, currency) : signed(row.amount, currency);
+
+export function cashLedger(workspace: Workspace, period: string, currency: Currency) {
+  const scoped = workspaceForCurrency(workspace, currency);
+  const cashAccounts = new Map(
+    scoped.accounts
+      .filter((account) => account.kind !== 'investment')
+      .map((account) => [account.id, account]),
+  );
+  const start = total(
+    balances(scoped, periodStart(period)).filter((row) => cashAccounts.has(row.account.id)),
+    (row) => row.value,
+  );
+  const posted = (id: string, date: string, value: number) => {
+    const account = cashAccounts.get(id);
+    return account && account.opening_date <= date ? value : 0;
+  };
+  const openings = [...cashAccounts.values()]
+    .filter((account) => account.opening_minor && inPeriod(account.opening_date, period))
+    .map((account) => ({
+      date: account.opening_date,
+      account: account.name,
+      opening: account.opening_minor,
+      change: account.opening_minor,
+      row: null,
+    }));
+  const movements = activity(scoped, period, currency).map((row) => {
+    const entry = row.entry;
+    const source = posted(
+      row.accountId,
+      row.date,
+      entry ? (entry.kind === 'income' ? entry.amount_minor : -entry.amount_minor) : row.amount,
+    );
+    const destination = entry?.destination_account_id
+      ? posted(entry.destination_account_id, row.date, entry.amount_minor)
+      : 0;
+    return {
+      date: row.date,
+      account: accountName(workspace, row.accountId),
+      opening: 0,
+      change: source + destination,
+      row,
+    };
+  });
+  let running = start;
+  const rows = [...openings, ...movements]
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        Number(Boolean(a.row?.balanceUpdate)) - Number(Boolean(b.row?.balanceUpdate)),
+    )
+    .map((item) => ({ ...item, balance: (running += item.change) }));
+  return {
+    rows,
+    start,
+    end: running,
+    openings: total(openings, (item) => item.opening),
+    inflow: total(movements, (item) => Math.max(0, item.change)),
+    outflow: total(movements, (item) => Math.max(0, -item.change)),
+  };
+}
