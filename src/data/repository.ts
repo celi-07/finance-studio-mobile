@@ -4,7 +4,7 @@ import { ConflictError, matchSnapshot, samePayload } from './concurrency';
 
 export type Row<K extends Collection = Collection> = Workspace[K][number];
 export interface Repository {
-  load(): Promise<Workspace>;
+  load(signal?: AbortSignal): Promise<Workspace>;
   save<K extends Collection>(collection: K, row: Row<K>, original?: Row<K>): Promise<Row<K>>;
   remove<K extends Collection>(collection: K, original: Row<K>): Promise<void>;
 }
@@ -21,7 +21,7 @@ function issue(error: { code?: string; message: string }): Error {
 }
 export function cloudRepository(client: SupabaseClient, userId: string): Repository {
   return {
-    async load() {
+    async load(signal) {
       const collections = Object.keys(emptyWorkspace) as Collection[];
       const pairs = await Promise.all(
         collections.map(async (collection) => {
@@ -35,6 +35,7 @@ export function cloudRepository(client: SupabaseClient, userId: string): Reposit
               .eq('user_id', userId)
               .order('id')
               .limit(500);
+            if (signal) query = query.abortSignal(signal);
             if (after) query = query.gt('id', after);
             const { data, error } = await query;
             if (error) throw issue(error);

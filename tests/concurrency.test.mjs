@@ -274,3 +274,110 @@ test('payload comparison handles key ordering in JSON while preserving array ord
   assert.equal(samePayload({ values: { b: 2, a: 1 } }, { values: { a: 1, b: 2 } }), true);
   assert.equal(samePayload({ values: [2, 1] }, { values: [1, 2] }), false);
 });
+
+test('a hung refresh times out, preserves visible records and permits a successful retry', async () => {
+  const hung = deferred();
+  let calls = 0,
+    signal;
+  const store = new WorkspaceStore(
+    repository({
+      load: (nextSignal) => {
+        calls++;
+        if (calls === 2) {
+          signal = nextSignal;
+          return hung.promise;
+        }
+        return Promise.resolve(workspace(calls === 1 ? 'cached' : 'recovered'));
+      },
+    }),
+    { refreshTimeoutMs: 30 },
+  );
+  await store.refresh();
+  const priorSync = store.snapshot().syncedAt;
+  await store.refresh();
+  assert.equal(signal.aborted, true);
+  assert.equal(store.snapshot().refreshing, false);
+  assert.equal(store.snapshot().loading, false);
+  assert.match(store.snapshot().error, /took too long/);
+  assert.equal(store.snapshot().data.finance_books[0].name, 'cached');
+  assert.equal(store.snapshot().syncedAt, priorSync);
+  await store.refresh();
+  assert.equal(store.snapshot().data.finance_books[0].name, 'recovered');
+  assert.equal(store.snapshot().error, '');
+  hung.resolve(workspace('late stale result'));
+  await tick();
+  assert.equal(store.snapshot().data.finance_books[0].name, 'recovered');
+});
+
+test('initial load also leaves its spinner after a timeout', async () => {
+  const store = new WorkspaceStore(repository({ load: () => new Promise(() => {}) }), {
+    refreshTimeoutMs: 20,
+  });
+  await store.refresh();
+  assert.equal(store.snapshot().loading, false);
+  assert.equal(store.snapshot().refreshing, false);
+  assert.match(store.snapshot().error, /try again/);
+});
+
+test('background refreshes share the active request without resetting its deadline', async () => {
+  let calls = 0;
+  const store = new WorkspaceStore(
+    repository({
+      load: () => {
+        calls++;
+        return new Promise(() => {});
+      },
+    }),
+    { refreshTimeoutMs: 30 },
+  );
+  const pull = store.refresh();
+  await tick();
+  const foreground = store.refresh({ background: true });
+  const poll = store.refresh({ background: true });
+  assert.equal(foreground, pull);
+  assert.equal(poll, pull);
+  await Promise.all([pull, foreground, poll]);
+  assert.equal(calls, 1);
+  assert.equal(store.snapshot().refreshing, false);
+  assert.match(store.snapshot().error, /took too long/);
+});
+
+test('a synchronous read failure still releases the active refresh for retry', async () => {
+  let calls = 0;
+  const store = new WorkspaceStore(
+    repository({
+      load: () => {
+        if (++calls === 1) throw Error('read failed');
+        return Promise.resolve(workspace('retry'));
+      },
+    }),
+  );
+  await store.refresh();
+  await store.refresh({ background: true });
+  assert.equal(calls, 2);
+  assert.equal(store.snapshot().error, '');
+  assert.equal(store.snapshot().data.finance_books[0].name, 'retry');
+});
+
+test('cloud loads pass cancellation to all table requests', async () => {
+  const signals = [];
+  const client = createClient('https://example.supabase.co', 'sb_publishable_test', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (_input, init) =>
+        new Promise((_, reject) => {
+          signals.push(init.signal);
+          const abort = () => reject(new DOMException('aborted', 'AbortError'));
+          if (init.signal.aborted) abort();
+          else init.signal.addEventListener('abort', abort, { once: true });
+        }),
+    },
+  });
+  const controller = new AbortController();
+  const loading = cloudRepository(client, 'owner').load(controller.signal);
+  await tick();
+  assert.equal(signals.length, Object.keys(emptyWorkspace).length);
+  controller.abort();
+  await assert.rejects(loading);
+  assert.ok(signals.every((signal) => signal.aborted));
+});

@@ -20,16 +20,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     () => new WorkspaceStore(demo ? demoRepository() : cloudRepository(client!, session!.user.id)),
   );
   useEffect(() => {
-    void store.refresh();
+    void store.refresh({ background: true });
     const foreground = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void store.refresh();
+      if (state === 'active') void store.refresh({ background: true });
     });
     const network = NetInfo.addEventListener((state) => {
-      if (state.isConnected && AppState.currentState === 'active') void store.refresh();
+      if (state.isConnected && AppState.currentState === 'active')
+        void store.refresh({ background: true });
     });
     // Polling remains a fallback when the existing project doesn't publish Realtime tables.
     const timer = setInterval(() => {
-      if (AppState.currentState === 'active') void store.refresh();
+      if (AppState.currentState === 'active') void store.refresh({ background: true });
     }, 30_000);
     const channel =
       !demo && client
@@ -39,7 +40,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               'postgres_changes',
               { event: '*', schema: 'public', filter: 'user_id=eq.' + session!.user.id },
               () => {
-                void store.refresh();
+                void store.refresh({ background: true });
               },
             )
             .subscribe()

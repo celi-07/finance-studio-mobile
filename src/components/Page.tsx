@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, FileDown, Plus, SlidersHorizontal } from 'lucide-react-native';
+import { usePullRefresh } from '../ui/use-pull-refresh';
 import { PageMotionProvider, RevealGroup } from '../ui/motion';
 import { RouteToneProvider, routeTones } from '../ui/theme';
 import { useTheme } from '../ui/theme';
@@ -41,6 +42,7 @@ export function Page({
   filterCount?: number;
 }) {
   const t = useTheme();
+  const pull = usePullRefresh();
   const insets = useSafeAreaInsets();
   const { data, loading, refreshing, saving, error, store } = useWorkspace();
   const { demo } = useAuth();
@@ -62,6 +64,15 @@ export function Page({
           <View style={styles.grow}>
             <Title size={30}>{routeLabels[route]}</Title>
           </View>
+          {route === 'Settings' && (
+            <Button
+              icon={Plus}
+              label="Add finance sheet"
+              onPress={() => f.open({ type: 'manage', collection: 'finance_books' })}
+            >
+              Add sheet
+            </Button>
+          )}
           {reporting && route !== 'Overview' && (
             <Button
               icon={Plus}
@@ -159,7 +170,15 @@ export function Page({
     <RouteToneProvider value={routeTones[route]}>
       <PageMotionProvider>
         <View testID="page-content" style={{ flex: 1 }}>
-          <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+          <View
+            testID="screen-safe-area"
+            style={{
+              flex: 1,
+              paddingTop: insets.top,
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+            }}
+          >
             {filtering && (
               <Sheet
                 title="Filters"
@@ -241,6 +260,7 @@ export function Page({
             )}
             {scroll ? (
               <ScrollView
+                testID="screen-scroll"
                 showsVerticalScrollIndicator={false}
                 showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -250,9 +270,9 @@ export function Page({
                 }}
                 refreshControl={
                   <RefreshControl
-                    refreshing={refreshing}
+                    refreshing={pull.refreshing}
                     tintColor={t.accent}
-                    onRefresh={() => void store.refresh()}
+                    onRefresh={pull.onRefresh}
                   />
                 }
               >
@@ -261,7 +281,7 @@ export function Page({
             ) : (
               <View style={{ flex: 1, paddingHorizontal: 17, paddingTop: 17 }}>{content}</View>
             )}
-          </SafeAreaView>
+          </View>
         </View>
       </PageMotionProvider>
     </RouteToneProvider>
