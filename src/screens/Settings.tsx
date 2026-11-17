@@ -5,9 +5,11 @@ import { useWorkspace } from '../state/workspace';
 import { useReport, type ManagementCollection } from '../state/finance';
 import { Page } from '../components/Page';
 import { Body, Button, ErrorNote, Panel, Title, styles, useSubmission } from '../ui/primitives';
+import { useTheme } from '../ui/theme';
 import { accountCurrency } from '../domain/ledger';
 export function Settings() {
   const auth = useAuth();
+  const t = useTheme();
   const f = useReport('Settings');
   const { data, syncedAt, store } = useWorkspace();
   const task = useSubmission();
@@ -79,6 +81,9 @@ export function Settings() {
             {auth.demo ? 'Fictional data, saved only on this device.' : auth.session?.user.email}
           </Body>
           <Body size={12} muted>
+            Appearance: {t.dark ? 'Dark' : 'Light'} (follows your device)
+          </Body>
+          <Body size={12} muted>
             {syncedAt
               ? 'Last refreshed ' + new Date(syncedAt).toLocaleTimeString()
               : 'Waiting to sync'}
@@ -104,57 +109,63 @@ export function Settings() {
           </Button>
           {!!task.error && <ErrorNote>{task.error}</ErrorNote>}
         </Panel>
-        {sections.map((section) => (
-          <Panel
-            tone={section.collection === 'categories' ? 'orchid' : 'mint'}
-            key={section.collection}
-          >
-            <View style={styles.between}>
-              <Title>{section.title}</Title>
-              <Button
-                icon={Plus}
-                quiet
-                onPress={() => f.open({ type: 'manage', collection: section.collection })}
-              >
-                Add
-              </Button>
-            </View>
-            {section.collection === 'finance_books' && (
-              <Body muted size={12}>
-                Personal is the default sheet.
-              </Body>
-            )}
-            {section.rows.map((row) => (
-              <View key={row.id} style={styles.between}>
-                <View style={styles.grow}>
-                  <Body bold size={13}>
-                    {row.label}
-                  </Body>
-                  <Body size={11} muted>
-                    {row.hint}
-                  </Body>
-                </View>
+        {sections
+          .toSorted(
+            (a, b) =>
+              Number(b.collection === 'finance_books') - Number(a.collection === 'finance_books'),
+          )
+          .map((section) => (
+            <Panel
+              tone={section.collection === 'categories' ? 'orchid' : 'mint'}
+              key={section.collection}
+            >
+              <View style={styles.between}>
+                <Title>{section.title}</Title>
                 <Button
-                  secondary
-                  onPress={() =>
-                    f.open({
-                      type: 'manage',
-                      collection: section.collection,
-                      original: row.original,
-                    })
-                  }
+                  icon={Plus}
+                  quiet={section.collection !== 'finance_books'}
+                  label={section.collection === 'finance_books' ? 'Add finance sheet' : undefined}
+                  onPress={() => f.open({ type: 'manage', collection: section.collection })}
                 >
-                  Edit
+                  {section.collection === 'finance_books' ? 'Add sheet' : 'Add'}
                 </Button>
               </View>
-            ))}
-            {!section.rows.length && (
-              <Body muted size={13}>
-                No {section.title.toLowerCase()} in this sheet yet.
-              </Body>
-            )}
-          </Panel>
-        ))}
+              {section.collection === 'finance_books' && (
+                <Body muted size={12}>
+                  Personal is the default sheet.
+                </Body>
+              )}
+              {section.rows.map((row) => (
+                <View key={row.id} style={styles.between}>
+                  <View style={styles.grow}>
+                    <Body bold size={13}>
+                      {row.label}
+                    </Body>
+                    <Body size={11} muted>
+                      {row.hint}
+                    </Body>
+                  </View>
+                  <Button
+                    secondary
+                    onPress={() =>
+                      f.open({
+                        type: 'manage',
+                        collection: section.collection,
+                        original: row.original,
+                      })
+                    }
+                  >
+                    Edit
+                  </Button>
+                </View>
+              ))}
+              {!section.rows.length && (
+                <Body muted size={13}>
+                  No {section.title.toLowerCase()} in this sheet yet.
+                </Body>
+              )}
+            </Panel>
+          ))}
         <Body muted size={11}>
           Finance Studio · Mobile 1.0.0{'\n'}Reporting dates use Asia/Jakarta. Currencies are never
           combined or converted.

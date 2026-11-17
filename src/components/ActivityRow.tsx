@@ -1,3 +1,4 @@
+import { Reveal } from '../ui/motion';
 import { Pressable, View } from 'react-native';
 import {
   ArrowLeftRight,
@@ -57,34 +58,45 @@ export function ActivityRow({
       f.open({ type: 'detail', collection: 'reimbursement_receipts', original: row.receipt });
   }
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${row.title}, ${activityMoney(row, currency)}`}
-      onPress={open}
-      style={({ pressed }) => [
-        { paddingVertical: 13, borderTopWidth: 1, borderColor: t.line, opacity: pressed ? 0.6 : 1 },
-      ]}
-    >
-      <View style={styles.row}>
-        <Glyph icon={icons[row.kind]} tone={tones[row.kind]} />
-        <View style={styles.grow}>
-          <Body bold size={13} lines={2}>
-            {row.title}
+    <Reveal group="row">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${row.title}, ${activityMoney(row, currency)}`}
+        onPress={open}
+        style={({ pressed }) => [
+          {
+            paddingVertical: 13,
+            borderTopWidth: 1,
+            borderColor: t.line,
+            opacity: pressed ? 0.6 : 1,
+          },
+        ]}
+      >
+        <View style={styles.row}>
+          <Glyph icon={icons[row.kind]} tone={tones[row.kind]} />
+          <View style={styles.grow}>
+            <Body bold size={13} lines={2}>
+              {row.title}
+            </Body>
+            <Body muted size={11} lines={1}>
+              {row.category} · {accountName(workspace, row.accountId)}
+            </Body>
+          </View>
+          <ChevronRight size={14} color={t.muted} />
+        </View>
+        <View style={[styles.between, { marginLeft: 50, marginTop: 4 }]}>
+          <Body muted size={11}>
+            {dayLabel(row.date)}
           </Body>
-          <Body muted size={11} lines={1}>
-            {row.category} · {accountName(workspace, row.accountId)}
+          <Body
+            bold
+            size={13}
+            color={row.amount > 0 && row.kind !== 'transfer' ? t.positive : t.ink}
+          >
+            {activityMoney(row, currency)}
           </Body>
         </View>
-        <ChevronRight size={14} color={t.muted} />
-      </View>
-      <View style={[styles.between, { marginLeft: 50, marginTop: 4 }]}>
-        <Body muted size={11}>
-          {dayLabel(row.date)}
-        </Body>
-        <Body bold size={13} color={row.amount > 0 && row.kind !== 'transfer' ? t.positive : t.ink}>
-          {activityMoney(row, currency)}
-        </Body>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Reveal>
   );
 }

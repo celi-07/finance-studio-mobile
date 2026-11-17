@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, FileDown, Plus, SlidersHorizontal } from 'lucide-react-native';
-import { usePageTransition } from '../ui/motion';
+import { PageMotionProvider, RevealGroup } from '../ui/motion';
 import { RouteToneProvider, routeTones } from '../ui/theme';
 import { useTheme } from '../ui/theme';
 import {
@@ -41,7 +41,6 @@ export function Page({
   filterCount?: number;
 }) {
   const t = useTheme();
-  const transition = usePageTransition();
   const insets = useSafeAreaInsets();
   const { data, loading, refreshing, saving, error, store } = useWorkspace();
   const { demo } = useAuth();
@@ -52,48 +51,48 @@ export function Page({
   const reporting = route !== 'Settings' && route !== 'Assistant';
   const header = (
     <View style={{ gap: 17, marginBottom: 16 }}>
-      <View style={styles.between}>
-        <Brand />
-        <Body size={11} muted>
-          {demo ? 'Demo' : saving ? 'Saving…' : refreshing ? 'Syncing…' : 'Connected'}
-        </Body>
-      </View>
-      <View testID="page-heading" style={[styles.between, { minHeight: 48 }]}>
-        <View style={styles.grow}>
-          <Title size={30}>{routeLabels[route]}</Title>
+      <RevealGroup>
+        <View style={styles.between}>
+          <Brand />
+          <Body size={11} muted>
+            {demo ? 'Demo' : saving ? 'Saving…' : refreshing ? 'Syncing…' : 'Connected'}
+          </Body>
         </View>
-        {reporting && route !== 'Overview' && (
-          <Button
-            icon={Plus}
-            onPress={() =>
-              f.open({
-                type: 'entry',
-                ...(route === 'Reimbursements'
-                  ? { claim: true, draft: blankDraft(f.bookData, f.month, 'expense') }
-                  : {}),
-              })
-            }
-          >
-            {route === 'Reimbursements' ? 'Add claim' : 'Add entry'}
-          </Button>
-        )}
-      </View>
-      <View style={styles.row}>
-        <View style={styles.grow}>
-          <Select
-            label="Finance sheet"
-            value={route === 'Overview' ? f.book : f.sheetId}
-            onChange={f.setBook}
-            options={[
-              ...(route === 'Overview' ? [{ value: 'all', label: 'All sheets' }] : []),
-              { value: '', label: 'Personal' },
-              ...data.finance_books.map((book) => ({ value: book.id, label: book.name })),
-            ]}
-          />
+        <View testID="page-heading" style={[styles.between, { minHeight: 48 }]}>
+          <View style={styles.grow}>
+            <Title size={30}>{routeLabels[route]}</Title>
+          </View>
+          {reporting && route !== 'Overview' && (
+            <Button
+              icon={Plus}
+              onPress={() =>
+                f.open({
+                  type: 'entry',
+                  ...(route === 'Reimbursements'
+                    ? { claim: true, draft: blankDraft(f.bookData, f.month, 'expense') }
+                    : {}),
+                })
+              }
+            >
+              {route === 'Reimbursements' ? 'Add claim' : 'Add entry'}
+            </Button>
+          )}
         </View>
-      </View>
-      {reporting && (
-        <>
+        <View style={styles.row}>
+          <View style={styles.grow}>
+            <Select
+              label="Finance sheet"
+              value={route === 'Overview' ? f.book : f.sheetId}
+              onChange={f.setBook}
+              options={[
+                ...(route === 'Overview' ? [{ value: 'all', label: 'All sheets' }] : []),
+                { value: '', label: 'Personal' },
+                ...data.finance_books.map((book) => ({ value: book.id, label: book.name })),
+              ]}
+            />
+          </View>
+        </View>
+        {reporting && (
           <View style={[styles.between, { flexWrap: 'wrap' }]}>
             <Button secondary icon={SlidersHorizontal} onPress={() => setFiltering(true)}>
               {filterCount ? `Filters (${filterCount})` : 'Filters'}
@@ -111,6 +110,8 @@ export function Page({
               PDF
             </Button>
           </View>
+        )}
+        {reporting && (
           <Body muted size={12}>
             {f.mode === 'all'
               ? 'All time'
@@ -123,14 +124,14 @@ export function Page({
               ? ` \u00b7 ${filterCount} active ${filterCount === 1 ? 'filter' : 'filters'}`
               : ''}
           </Body>
-        </>
-      )}
-      {!!(error || exporting.error) && <ErrorNote>{error || exporting.error}</ErrorNote>}
-      {!!error && (
-        <Button secondary onPress={() => void store.refresh()}>
-          Retry refresh
-        </Button>
-      )}
+        )}
+        {!!(error || exporting.error) && <ErrorNote>{error || exporting.error}</ErrorNote>}
+        {!!error && (
+          <Button secondary onPress={() => void store.refresh()}>
+            Retry refresh
+          </Button>
+        )}
+      </RevealGroup>
     </View>
   );
   if (loading)
@@ -156,109 +157,113 @@ export function Page({
   );
   return (
     <RouteToneProvider value={routeTones[route]}>
-      <Animated.View testID="page-transition" style={[{ flex: 1 }, transition]}>
-        <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
-          {filtering && (
-            <Sheet
-              title="Filters"
-              onClose={() => {
-                setFiltering(false);
-                setDatePicker(false);
-              }}
-            >
-              <View style={styles.stack}>
-                <Segments
-                  value={f.mode}
-                  onChange={f.setMode}
-                  options={[
-                    { value: 'month', label: 'Month' },
-                    { value: 'year', label: 'Year' },
-                    { value: 'all', label: 'All time' },
-                  ]}
-                />
-                {f.mode !== 'all' && (
-                  <View
-                    style={[
-                      styles.between,
-                      {
-                        borderWidth: 1,
-                        borderColor: t.line,
-                        borderRadius: 12,
-                        backgroundColor: t.surface,
-                      },
+      <PageMotionProvider>
+        <View testID="page-content" style={{ flex: 1 }}>
+          <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+            {filtering && (
+              <Sheet
+                title="Filters"
+                onClose={() => {
+                  setFiltering(false);
+                  setDatePicker(false);
+                }}
+              >
+                <View style={styles.stack}>
+                  <Segments
+                    value={f.mode}
+                    onChange={f.setMode}
+                    options={[
+                      { value: 'month', label: 'Month' },
+                      { value: 'year', label: 'Year' },
+                      { value: 'all', label: 'All time' },
                     ]}
-                  >
-                    <Button
-                      quiet
-                      icon={ChevronLeft}
-                      label="Previous period"
-                      onPress={() => f.setMonth(shiftMonth(f.month, f.mode === 'year' ? -12 : -1))}
-                      disabled={f.month <= '1900-01'}
-                    />
-                    <Button quiet onPress={() => setDatePicker(!datePicker)}>
-                      {f.mode === 'year' ? f.month.slice(0, 4) : monthLabel(f.month)}
-                    </Button>
-                    <Button
-                      quiet
-                      icon={ChevronRight}
-                      label="Next period"
-                      onPress={() => f.setMonth(shiftMonth(f.month, f.mode === 'year' ? 12 : 1))}
-                      disabled={f.month >= '2199-01'}
-                    />
-                  </View>
-                )}
-                {datePicker && (
-                  <Select
-                    label="Jump to month"
-                    value={f.month}
-                    onChange={(value) => {
-                      f.setMonth(value);
-                      setDatePicker(false);
-                    }}
-                    options={Array.from({ length: 49 }, (_, i) => {
-                      const value = shiftMonth(f.month, i - 24);
-                      return { value, label: monthLabel(value) };
-                    })}
                   />
-                )}
-                <Select
-                  label="Reporting currency"
-                  value={f.currency}
-                  onChange={(value) => f.setCurrency(value as Currency)}
-                  options={(f.currencies.length ? f.currencies : [f.currency]).map((value) => ({
-                    value,
-                    label: value,
-                  }))}
-                />
-                {filters}
-                <Button onPress={() => setFiltering(false)}>Show results</Button>
-              </View>
-            </Sheet>
-          )}
-          {scroll ? (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{
-                padding: 17,
-                paddingBottom: screenBottomPadding(insets.bottom),
-              }}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  tintColor={t.accent}
-                  onRefresh={() => void store.refresh()}
-                />
-              }
-            >
-              {content}
-            </ScrollView>
-          ) : (
-            <View style={{ flex: 1, paddingHorizontal: 17, paddingTop: 17 }}>{content}</View>
-          )}
-        </SafeAreaView>
-      </Animated.View>
+                  {f.mode !== 'all' && (
+                    <View
+                      style={[
+                        styles.between,
+                        {
+                          borderWidth: 1,
+                          borderColor: t.line,
+                          borderRadius: 12,
+                          backgroundColor: t.surface,
+                        },
+                      ]}
+                    >
+                      <Button
+                        quiet
+                        icon={ChevronLeft}
+                        label="Previous period"
+                        onPress={() =>
+                          f.setMonth(shiftMonth(f.month, f.mode === 'year' ? -12 : -1))
+                        }
+                        disabled={f.month <= '1900-01'}
+                      />
+                      <Button quiet onPress={() => setDatePicker(!datePicker)}>
+                        {f.mode === 'year' ? f.month.slice(0, 4) : monthLabel(f.month)}
+                      </Button>
+                      <Button
+                        quiet
+                        icon={ChevronRight}
+                        label="Next period"
+                        onPress={() => f.setMonth(shiftMonth(f.month, f.mode === 'year' ? 12 : 1))}
+                        disabled={f.month >= '2199-01'}
+                      />
+                    </View>
+                  )}
+                  {datePicker && (
+                    <Select
+                      label="Jump to month"
+                      value={f.month}
+                      onChange={(value) => {
+                        f.setMonth(value);
+                        setDatePicker(false);
+                      }}
+                      options={Array.from({ length: 49 }, (_, i) => {
+                        const value = shiftMonth(f.month, i - 24);
+                        return { value, label: monthLabel(value) };
+                      })}
+                    />
+                  )}
+                  <Select
+                    label="Reporting currency"
+                    value={f.currency}
+                    onChange={(value) => f.setCurrency(value as Currency)}
+                    options={(f.currencies.length ? f.currencies : [f.currency]).map((value) => ({
+                      value,
+                      label: value,
+                    }))}
+                  />
+                  {filters}
+                  <Button onPress={() => setFiltering(false)}>Show results</Button>
+                </View>
+              </Sheet>
+            )}
+            {scroll ? (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{
+                  padding: 17,
+                  paddingBottom: screenBottomPadding(insets.bottom),
+                }}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    tintColor={t.accent}
+                    onRefresh={() => void store.refresh()}
+                  />
+                }
+              >
+                {content}
+              </ScrollView>
+            ) : (
+              <View style={{ flex: 1, paddingHorizontal: 17, paddingTop: 17 }}>{content}</View>
+            )}
+          </SafeAreaView>
+        </View>
+      </PageMotionProvider>
     </RouteToneProvider>
   );
 }

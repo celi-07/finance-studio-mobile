@@ -16,6 +16,9 @@ function theme(dark: boolean) {
   return {
     dark,
     palette: p,
+    action: dark ? '#bda0e7' : '#5c358d',
+    actionTop: dark ? '#d1b3fa' : '#7046ab',
+    actionText: dark ? '#241333' : '#ffffff',
     canvas: p.canvas,
     canvasEnd: p['canvas-end'],
     canvasOrchid: p['canvas-orchid'],
