@@ -1,3 +1,4 @@
+import { usePullRefresh } from '../ui/use-pull-refresh';
 import { useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,14 +7,13 @@ import { activity, accountName, kinds } from '../domain/ledger';
 import { Page } from '../components/Page';
 import { ActivityRow } from '../components/ActivityRow';
 import { useReport } from '../state/finance';
-import { useWorkspace } from '../state/workspace';
 import { Body, Button, Empty, Input, Panel, Select, styles } from '../ui/primitives';
 import { useTheme } from '../ui/theme';
 export function Transactions() {
+  const pull = usePullRefresh();
   const f = useReport('Transactions');
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { refreshing, store } = useWorkspace();
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState('');
   const [account, setAccount] = useState('');
@@ -98,8 +98,8 @@ export function Transactions() {
           data={rows}
           keyExtractor={(row) => row.id}
           initialNumToRender={12}
-          refreshing={refreshing}
-          onRefresh={() => void store.refresh()}
+          refreshing={pull.refreshing}
+          onRefresh={pull.onRefresh}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: screenBottomPadding(insets.bottom) }}
           ListHeaderComponent={

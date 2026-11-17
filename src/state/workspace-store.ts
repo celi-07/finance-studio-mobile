@@ -16,7 +16,15 @@ export class WorkspaceStore {
     error: '',
     syncedAt: 0,
   };
-  constructor(private repository: Repository) {}
+  private refreshTask?: { controller: AbortController; promise: Promise<void> };
+  constructor(
+    private repository: Repository,
+    private options: { refreshTimeoutMs?: number } = {},
+  ) {}
+  private cancelRefresh() {
+    this.refreshTask?.controller.abort();
+    this.refreshTask = undefined;
+  }
   snapshot = () => this.state;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -32,27 +40,55 @@ export class WorkspaceStore {
   dispose() {
     this.disposed = true;
     this.ticket++;
+    this.cancelRefresh();
     this.listeners.clear();
   }
-  async refresh() {
-    if (this.disposed || this.pending) return;
+  refresh({ background = false } = {}): Promise<void> {
+    if (this.disposed || this.pending) return Promise.resolve();
+    if (background && this.refreshTask) return this.refreshTask.promise;
     const ticket = ++this.ticket;
+    this.cancelRefresh();
+    const controller = new AbortController();
+    const aborted = new Promise<never>((_, reject) => {
+      controller.signal.addEventListener(
+        'abort',
+        () =>
+          reject(
+            new Error(
+              'Refreshing took too long. Check your connection and try again. Your displayed records are unchanged.',
+            ),
+          ),
+        { once: true },
+      );
+    });
+    const timer = setTimeout(() => controller.abort(), this.options.refreshTimeoutMs ?? 15_000);
     this.patch({ refreshing: true, error: '' });
-    try {
-      const data = await this.repository.load();
-      if (ticket === this.ticket) this.patch({ data, syncedAt: Date.now() });
-    } catch (error) {
-      if (ticket === this.ticket)
-        this.patch({
-          error: error instanceof Error ? error.message : 'Couldn’t refresh your records.',
-        });
-    } finally {
-      if (ticket === this.ticket) this.patch({ loading: false, refreshing: false });
-    }
+    const promise = (async () => {
+      try {
+        const data = await Promise.race([
+          Promise.resolve().then(() => this.repository.load(controller.signal)),
+          aborted,
+        ]);
+        if (ticket === this.ticket) this.patch({ data, syncedAt: Date.now() });
+      } catch (error) {
+        if (ticket === this.ticket)
+          this.patch({
+            error: error instanceof Error ? error.message : 'Couldn’t refresh your records.',
+          });
+      } finally {
+        clearTimeout(timer);
+        controller.abort();
+        if (this.refreshTask?.controller === controller) this.refreshTask = undefined;
+        if (ticket === this.ticket) this.patch({ loading: false, refreshing: false });
+      }
+    })();
+    this.refreshTask = { controller, promise };
+    return promise;
   }
   private async write(operation: () => Promise<void>) {
     this.pending++;
     this.ticket++; // Invalidate any read that began before this write.
+    this.cancelRefresh();
     this.patch({ saving: true, refreshing: false });
     try {
       await this.queue.run(async () => {

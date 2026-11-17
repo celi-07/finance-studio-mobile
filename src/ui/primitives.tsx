@@ -32,7 +32,7 @@ import { PaintedView } from './paint';
 import { ItemMotionContext, useItemReveal } from './motion';
 import { Check, ChevronDown, type LucideIcon } from 'lucide-react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, blend, useRouteTone, useTheme, wash, type Tone } from './theme';
 import { fonts, shouldDismissSheet } from './layout';
 
@@ -356,6 +356,7 @@ export function Sheet({
 }) {
   const t = useTheme();
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(height)).current;
   const shade = useRef(new Animated.Value(0)).current;
   const closing = useRef(false);
@@ -473,85 +474,98 @@ export function Sheet({
         disabled={locked}
         onPress={dismiss}
       />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <View
+        testID="sheet-safe-area"
+        style={{
+          flex: 1,
+          paddingTop: insets.top + 8,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        }}
         pointerEvents="box-none"
-        style={{ flex: 1, justifyContent: 'flex-end' }}
       >
-        <Animated.View
-          accessibilityViewIsModal
-          onAccessibilityEscape={dismiss}
-          style={{
-            maxHeight: '92%',
-            width: '100%',
-            maxWidth: 680,
-            alignSelf: 'center',
-            backgroundColor: t.surface,
-            borderTopLeftRadius: 25,
-            borderTopRightRadius: 25,
-            overflow: 'hidden',
-            transform: [{ translateY }],
-          }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          pointerEvents="box-none"
+          style={{ flex: 1, justifyContent: 'flex-end' }}
         >
-          <View
-            {...pan.panHandlers}
-            testID="sheet-drag-region"
-            style={{ minHeight: 100, borderBottomWidth: 1, borderColor: t.line }}
+          <Animated.View
+            testID="sheet-panel"
+            accessibilityViewIsModal
+            onAccessibilityEscape={dismiss}
+            style={{
+              maxHeight: '100%',
+              width: '100%',
+              maxWidth: 680,
+              alignSelf: 'center',
+              backgroundColor: t.surface,
+              borderTopLeftRadius: 25,
+              borderTopRightRadius: 25,
+              overflow: 'hidden',
+              transform: [{ translateY }],
+            }}
           >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Dismiss dialog"
-              accessibilityHint="You can also drag this header down to close"
-              onAccessibilityTap={dismiss}
-              onPress={dismiss}
-              disabled={locked}
-              style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <View
-                style={{ width: 42, height: 5, borderRadius: 3, backgroundColor: t.strongLine }}
-              />
-            </Pressable>
             <View
-              pointerEvents="none"
-              style={{
-                paddingHorizontal: 18,
-                paddingBottom: 18,
-                minHeight: 50,
-                justifyContent: 'center',
-              }}
+              {...pan.panHandlers}
+              testID="sheet-drag-region"
+              style={{ minHeight: 100, borderBottomWidth: 1, borderColor: t.line }}
             >
-              <Title size={21}>{title}</Title>
-            </View>
-          </View>
-          {confirmDiscard && (
-            <View style={{ padding: 18, gap: 10, borderBottomWidth: 1, borderColor: t.line }}>
-              <Body bold>Discard unsaved changes?</Body>
-              <View style={styles.actions}>
-                <Button secondary onPress={() => setConfirmDiscard(false)}>
-                  Keep editing
-                </Button>
-                <Button secondary danger onPress={animateDismiss}>
-                  Discard changes
-                </Button>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss dialog"
+                accessibilityHint="You can also drag this header down to close"
+                onAccessibilityTap={dismiss}
+                onPress={dismiss}
+                disabled={locked}
+                style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <View
+                  style={{ width: 42, height: 5, borderRadius: 3, backgroundColor: t.strongLine }}
+                />
+              </Pressable>
+              <View
+                pointerEvents="none"
+                style={{
+                  paddingHorizontal: 18,
+                  paddingBottom: 18,
+                  minHeight: 50,
+                  justifyContent: 'center',
+                }}
+              >
+                <Title size={21}>{title}</Title>
               </View>
             </View>
-          )}
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            style={{ flexShrink: 1 }}
-            contentContainerStyle={{ padding: 18, gap: 16 }}
-          >
-            <SafeAreaView edges={['bottom']}>
-              <ItemMotionContext.Provider value={null}>
-                <InSheet.Provider value={true}>{children}</InSheet.Provider>
-              </ItemMotionContext.Provider>
-            </SafeAreaView>
-          </ScrollView>
-        </Animated.View>
-      </KeyboardAvoidingView>
+            {confirmDiscard && (
+              <View style={{ padding: 18, gap: 10, borderBottomWidth: 1, borderColor: t.line }}>
+                <Body bold>Discard unsaved changes?</Body>
+                <View style={styles.actions}>
+                  <Button secondary onPress={() => setConfirmDiscard(false)}>
+                    Keep editing
+                  </Button>
+                  <Button secondary danger onPress={animateDismiss}>
+                    Discard changes
+                  </Button>
+                </View>
+              </View>
+            )}
+            <ScrollView
+              testID="sheet-scroll"
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              style={{ flexShrink: 1 }}
+              contentContainerStyle={{ padding: 18, paddingBottom: 18 + insets.bottom, gap: 16 }}
+            >
+              <View testID="sheet-content">
+                <ItemMotionContext.Provider value={null}>
+                  <InSheet.Provider value={true}>{children}</InSheet.Provider>
+                </ItemMotionContext.Provider>
+              </View>
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

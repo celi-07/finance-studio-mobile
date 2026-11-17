@@ -121,14 +121,15 @@ export function Settings() {
             >
               <View style={styles.between}>
                 <Title>{section.title}</Title>
-                <Button
-                  icon={Plus}
-                  quiet={section.collection !== 'finance_books'}
-                  label={section.collection === 'finance_books' ? 'Add finance sheet' : undefined}
-                  onPress={() => f.open({ type: 'manage', collection: section.collection })}
-                >
-                  {section.collection === 'finance_books' ? 'Add sheet' : 'Add'}
-                </Button>
+                {section.collection !== 'finance_books' && (
+                  <Button
+                    icon={Plus}
+                    quiet
+                    onPress={() => f.open({ type: 'manage', collection: section.collection })}
+                  >
+                    Add
+                  </Button>
+                )}
               </View>
               {section.collection === 'finance_books' && (
                 <Body muted size={12}>

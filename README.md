@@ -21,11 +21,15 @@ To override the project, copy `.env.example` to `.env.local` and supply both `EX
 
 ## Mobile navigation and forms
 
-The six destinations are **Overview, Entries, Claims, Invest, Assistant, Settings**. The floating tab bar uses one full-size gradient surface and rounded rectangular selected tabs. Tap a destination or slide across the bar to preview its changing gradient and select on release; canceling a slide preserves the current tab. Headers, cards and activity rows reveal separately when switching tabs, with travel removed for Reduce Motion. All screens scroll without visible scroll indicators, with space reserved above the home indicator and tab bar.
+The six destinations are **Overview, Entries, Claims, Invest, Assistant, Settings**. The floating tab bar uses one full-size gradient surface and selected tabs with the same capsule curvature and space around their icon and label. Tap a destination or slide across the bar to preview its changing gradient and select on release; canceling a slide preserves the current tab. Headers, cards and activity rows reveal separately when switching tabs, with travel removed for Reduce Motion. All screens scroll without visible scroll indicators, with space reserved above the home indicator and tab bar.
 
-Reporting screens use **Filters** for period, currency and screen-specific search/type/account or claim/person filters. Current period and currency remain visible above the report. Overview has no Add entry action; record expenses and income in Entries. Claims opens a reimbursement form with full, partial and split amounts, payer and optional due date. Use **Settings > Finance sheets > Add sheet** to create a business sheet; a newly created sheet becomes selected automatically.
+Reporting screens use **Filters** for period, currency and screen-specific search/type/account or claim/person filters. Current period and currency remain visible above the report. Overview has no Add entry action; record expenses and income in Entries. Claims opens a reimbursement form with full, partial and split amounts, payer and optional due date. Use **Settings > Add sheet** to create a business sheet; a newly created sheet becomes selected automatically.
 
 Sheets fade the dimmed background separately from the sliding content. Drag anywhere in the full-width, 100-point header, tap the grabber, or tap the dimmed backdrop to dismiss. Titles align left, without an X button. Unsaved entry and management forms offer Keep editing or Discard changes. Pickers inside sheets expand in place, avoiding stacked native modals.
+
+Screens keep their content inside the status-bar/notch and side safe areas, and reserve scrolling space above the floating tab bar and home indicator. Sheets keep their title below the top safe area and their final action above the bottom safe area, including in landscape.
+
+Pull to refresh runs only the requested screen’s spinner; background sync stays separate. Reads time out after 15 seconds, preserve the displayed records on failure and show Retry refresh. Foreground, reconnect, polling and Realtime updates share an already active request instead of restarting its deadline.
 
 Both the website and mobile follow the device light/dark preference; Settings shows the current mobile appearance. Mobile primary actions use a plum gradient in light appearance and lavender in dark appearance, while retaining the website palette for other surfaces.
 

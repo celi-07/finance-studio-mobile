@@ -335,10 +335,10 @@ export function StudioTabBar({ state, navigation }: BottomTabBarProps) {
                 pointerEvents="none"
                 style={{
                   position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  left: 0,
-                  width: itemWidth,
+                  top: -2,
+                  bottom: -2,
+                  left: -5,
+                  width: itemWidth + 10,
                   borderRadius: tabBar.itemRadius,
                   overflow: 'hidden',
                   borderWidth: 1,
