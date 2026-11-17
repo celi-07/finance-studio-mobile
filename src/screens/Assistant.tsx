@@ -58,7 +58,7 @@ export function Assistant() {
           >
             Prepare draft
           </Button>
-          {task.error && <ErrorNote>{task.error}</ErrorNote>}
+          {!!task.error && <ErrorNote>{task.error}</ErrorNote>}
         </Panel>
         {current && (
           <Panel tone="amber">

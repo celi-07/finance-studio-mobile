@@ -102,7 +102,7 @@ export function Settings() {
           >
             {auth.demo ? 'Leave demo' : 'Sign out'}
           </Button>
-          {task.error && <ErrorNote>{task.error}</ErrorNote>}
+          {!!task.error && <ErrorNote>{task.error}</ErrorNote>}
         </Panel>
         {sections.map((section) => (
           <Panel tone="mint" key={section.collection}>

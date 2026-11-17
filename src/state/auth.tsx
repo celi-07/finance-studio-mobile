@@ -128,6 +128,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         oauth: async (provider) => {
           if (!client || oauthBusy.current) return;
+          if (/^exps?:/.test(redirectTo))
+            throw Error(
+              'Provider sign-in requires an installed Finance Studio build. In Expo Go, use an email code or explore the demo.',
+            );
           oauthBusy.current = true;
           try {
             const { data, error: issue } = await client.auth.signInWithOAuth({
