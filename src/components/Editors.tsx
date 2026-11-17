@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Switch, View } from 'react-native';
 import { Plus, Trash2 } from 'lucide-react-native';
 import {
@@ -83,7 +83,7 @@ function Actions({
   const [confirm, setConfirm] = useState(false);
   return (
     <View style={{ gap: 12, marginTop: 18 }}>
-      {task.error && <ErrorNote>{task.error}</ErrorNote>}
+      {!!task.error && <ErrorNote>{task.error}</ErrorNote>}
       {children}
       {save && (
         <Button busy={task.busy} onPress={() => task.run(save)}>
@@ -112,6 +112,7 @@ function Actions({
 
 function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
   const f = useReport();
+  const t = useTheme();
   const { data, store } = useWorkspace();
   const { original } = editor;
   const [sheetId] = useState(() =>
@@ -132,8 +133,11 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
         ? original.amount_minor === original.reimbursable_minor
           ? 'full'
           : 'partial'
-        : 'none',
+        : editor.claim
+          ? 'full'
+          : 'none',
   );
+  const initial = useRef(JSON.stringify({ draft, mode }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const task = useSubmission();
   const currency = currencyForAccount(data, draft.account_id);
@@ -156,29 +160,41 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
     />
   );
   return (
-    <Sheet title={original ? 'Edit entry' : 'Add entry'} onClose={f.close} locked={task.busy}>
+    <Sheet
+      title={original ? 'Edit entry' : editor.claim ? 'Add reimbursement' : 'Add entry'}
+      dirty={initial.current !== JSON.stringify({ draft, mode })}
+      onClose={f.close}
+      locked={task.busy}
+    >
       <View style={styles.stack} pointerEvents={task.busy ? 'none' : 'auto'}>
         <Body muted size={12}>
           {sheetId ? data.finance_books.find((b) => b.id === sheetId)?.name : 'Personal'} ·{' '}
           {currency}
         </Body>
-        <Select
-          label="Entry type"
-          value={draft.kind}
-          onChange={(kind) => {
-            const accounts = editableAccounts(workspace, kind);
-            patch({
-              kind,
-              account_id: accounts.some((a) => a.id === draft.account_id)
-                ? draft.account_id
-                : (accounts[0]?.id ?? ''),
-              destination_account_id: null,
-              category_id: null,
-            });
-          }}
-          options={Object.entries(kinds).map(([value, label]) => ({ value, label }))}
-          disabled={task.busy}
-        />
+        {editor.claim && (
+          <Body muted>
+            Record the expense you paid, then choose how much is owed back and by whom.
+          </Body>
+        )}
+        {!editor.claim && (
+          <Select
+            label="Entry type"
+            value={draft.kind}
+            onChange={(kind) => {
+              const accounts = editableAccounts(workspace, kind);
+              patch({
+                kind,
+                account_id: accounts.some((a) => a.id === draft.account_id)
+                  ? draft.account_id
+                  : (accounts[0]?.id ?? ''),
+                destination_account_id: null,
+                category_id: null,
+              });
+            }}
+            options={Object.entries(kinds).map(([value, label]) => ({ value, label }))}
+            disabled={task.busy}
+          />
+        )}
         {field('description', 'Description', { maxLength: 160, placeholder: 'What was this for?' })}
         {field('amount', 'Amount (' + currency + ')', {
           keyboardType: 'decimal-pad',
@@ -193,7 +209,7 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
           options={source.map((a) => ({ value: a.id, label: a.name + ' · ' + accountCurrency(a) }))}
           disabled={task.busy}
         />
-        {errors.account_id && <ErrorNote>{errors.account_id}</ErrorNote>}
+        {!!errors.account_id && <ErrorNote>{errors.account_id}</ErrorNote>}
         {!source.length && (
           <Button secondary onPress={() => f.open({ type: 'manage', collection: 'accounts' })}>
             Create a financial account first
@@ -211,7 +227,7 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
               ]}
               disabled={task.busy}
             />
-            {errors.destination_account_id && (
+            {!!errors.destination_account_id && (
               <ErrorNote>{errors.destination_account_id}</ErrorNote>
             )}
           </>
@@ -260,7 +276,7 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
                   });
               }}
               options={[
-                { value: 'none', label: 'None' },
+                ...(!editor.claim ? [{ value: 'none', label: 'None' }] : []),
                 { value: 'partial', label: 'Partial' },
                 { value: 'full', label: 'Full' },
                 { value: 'split', label: 'Split between people' },
@@ -303,7 +319,7 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
                       style={{
                         padding: 12,
                         borderWidth: 1,
-                        borderColor: '#ccd4e2',
+                        borderColor: t.strongLine,
                         borderRadius: 12,
                         gap: 10,
                       }}
@@ -358,7 +374,7 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
                 </Button>
               </>
             )}
-            {errors.reimbursable && <ErrorNote>{errors.reimbursable}</ErrorNote>}
+            {!!errors.reimbursable && <ErrorNote>{errors.reimbursable}</ErrorNote>}
           </>
         )}
         {field('notes', 'Notes (optional)', { multiline: true })}
@@ -389,7 +405,7 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
                 placeholder={def.field_type === 'date' ? 'YYYY-MM-DD' : ''}
               />
             )}
-            {errors[def.id] && <ErrorNote>{errors[def.id]}</ErrorNote>}
+            {!!errors[def.id] && <ErrorNote>{errors[def.id]}</ErrorNote>}
           </View>
         ))}
         <Actions
@@ -445,6 +461,8 @@ function ManagementForm({ editor }: { editor: Extract<Editor, { type: 'manage' }
   const [options, setOptions] = useState(original?.options?.join('\n') ?? '');
   const [color, setColor] = useState(original?.color ?? 'green');
   const [sheetId] = useState(original?.ledger_id ?? f.sheetId);
+  const values = { name, kind, currency, opening, date, archived, required, type, options, color };
+  const initial = useRef(JSON.stringify(values));
   const task = useSubmission();
   const titles = {
     accounts: 'account',
@@ -458,6 +476,7 @@ function ManagementForm({ editor }: { editor: Extract<Editor, { type: 'manage' }
   return (
     <Sheet
       title={(original ? 'Edit ' : 'Add ') + titles[collection]}
+      dirty={initial.current !== JSON.stringify(values)}
       onClose={f.close}
       locked={task.busy}
     >
@@ -611,6 +630,7 @@ function ManagementForm({ editor }: { editor: Extract<Editor, { type: 'manage' }
               row = { id, name: clean };
             }
             await store.save(collection, row, original);
+            if (collection === 'finance_books' && !original) f.setBook(id);
             f.close();
           }}
         />

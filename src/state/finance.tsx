@@ -21,7 +21,7 @@ export type Route =
 export type ManagementCollection =
   'accounts' | 'categories' | 'field_definitions' | 'finance_books' | 'reimbursement_people';
 export type Editor =
-  | { type: 'entry'; original?: Entry; draft?: EntryDraft }
+  | { type: 'entry'; original?: Entry; draft?: EntryDraft; claim?: boolean }
   | { type: 'manage'; collection: ManagementCollection; original?: Row }
   | { type: 'goal'; original?: SavingsGoal }
   | { type: 'valuation'; accountId: string; original?: Valuation }

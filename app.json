@@ -21,7 +21,30 @@
         "backgroundColor": "#161616"
       }
     },
-    "plugins": ["expo-secure-store", "expo-web-browser", "expo-sharing"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-sharing",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/PlusJakartaSans-Regular.ttf",
+            "./assets/fonts/PlusJakartaSans-Bold.ttf"
+          ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f1f3f8",
+          "image": "./assets/splash-light.png",
+          "imageWidth": 280,
+          "resizeMode": "contain",
+          "dark": { "backgroundColor": "#10141f", "image": "./assets/splash-dark.png" }
+        }
+      ]
+    ],
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"

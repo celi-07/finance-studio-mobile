@@ -24,7 +24,44 @@ export function Reimbursements() {
   const report = reimbursementReport(f.workspace, f.period, person ? [person] : []);
   const rows = report.claims.filter((row) => status === 'All' || row.status === status);
   return (
-    <Page route="Reimbursements" statementFilters={{ people: person ? [person] : [] }}>
+    <Page
+      route="Reimbursements"
+      statementFilters={{ people: person ? [person] : [] }}
+      filterCount={Number(status !== 'All') + Number(!!person)}
+      filters={
+        <View style={styles.stack}>
+          <Segments
+            value={status}
+            onChange={setStatus}
+            options={['All', 'Pending', 'Partial', 'Settled'].map((value) => ({
+              value,
+              label: value,
+            }))}
+          />
+          <Select
+            label="Filter by person"
+            value={person}
+            onChange={setPerson}
+            options={[
+              { value: '', label: 'All people' },
+              ...reimbursementReport(f.workspace, f.period).people.map((value) => ({
+                value,
+                label: value,
+              })),
+            ]}
+          />
+          <Button
+            quiet
+            onPress={() => {
+              setStatus('All');
+              setPerson('');
+            }}
+          >
+            Clear claim filters
+          </Button>
+        </View>
+      }
+    >
       <View style={styles.stack}>
         <Panel tone="amber">
           <View style={styles.row}>
@@ -41,26 +78,6 @@ export function Reimbursements() {
             </Body>
           </View>
         </Panel>
-        <Segments
-          value={status}
-          onChange={setStatus}
-          options={['All', 'Pending', 'Partial', 'Settled'].map((value) => ({
-            value,
-            label: value,
-          }))}
-        />
-        <Select
-          label="Filter by person"
-          value={person}
-          onChange={setPerson}
-          options={[
-            { value: '', label: 'All people' },
-            ...reimbursementReport(f.workspace, f.period).people.map((value) => ({
-              value,
-              label: value,
-            })),
-          ]}
-        />
         {rows.map((row) => (
           <Panel key={row.key} tone="amber">
             <View style={styles.between}>
@@ -92,7 +109,7 @@ export function Reimbursements() {
                 }}
               />
             </View>
-            <View style={styles.row}>
+            <View style={styles.actions}>
               <Button secondary onPress={() => f.open({ type: 'entry', original: row.entry })}>
                 View expense
               </Button>

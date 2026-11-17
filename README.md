@@ -19,6 +19,16 @@ The app defaults to the existing website's **public** Supabase project settings 
 
 To override the project, copy `.env.example` to `.env.local` and supply both `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Restart Metro after changing environment variables. Explicitly leaving both empty enables standalone demo mode. Never put a service-role key, database password, or OAuth client secret in the app.
 
+## Mobile navigation and forms
+
+The six destinations are **Overview, Entries, Claims, Invest, Assistant, Settings**. The floating tab bar keeps side margins and rounded selected tabs. All screens scroll without visible scroll indicators, with space reserved above the home indicator and tab bar.
+
+Reporting screens use **Filters** for period, currency and screen-specific search/type/account or claim/person filters. Current period and currency remain visible above the report. Overview has no Add entry action; record expenses and income in Entries. Claims opens a reimbursement form with full, partial and split amounts, payer and optional due date. Use the **+ beside Finance sheet** (or Settings > Finance sheets > Add) to create a business sheet; a newly created sheet becomes selected automatically.
+
+Sheets fade the dimmed background separately from the sliding content. Drag the header down or tap Close to dismiss. Unsaved entry and management forms offer Keep editing or Discard changes. Pickers inside sheets expand in place, avoiding stacked native modals.
+
+The app bundles the licensed Plus Jakarta Sans fonts and light/dark splash artwork. The branded native launch configuration requires a new installed build. Expo Go does not fully reproduce native splash screens; the React loading view displays the same identity while fonts and authentication restore. No artificial launch delay is added.
+
 ## Authentication setup
 
 The existing database's owner policies and email-code requirement remain in force. Existing accounts can use an email code immediately if email OTP delivery is enabled. Password and provider sessions must complete the same email-code check before loading records.
@@ -35,14 +45,14 @@ Native sessions are chunked and stored in Expo SecureStore. Writes publish a new
 
 ## Features
 
-| Section        | Mobile behavior                                                                                                                                                                   |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Overview       | Cash balance, cash flow, summaries, spending breakdown, recent activity, account balances, currency summaries, activity calendar, savings goals, wealth and income/expense charts |
-| Transactions   | Virtualized activity list, search/type/account filters, add/edit/delete, transfers, contributions/withdrawals, custom fields, split reimbursement claims                          |
-| Reimbursements | Outstanding claims, status/person filters, record a deposit, link an existing income payment, inspect and remove individual payments                                              |
-| Investments    | Portfolio estimates, contributions/withdrawals, create and edit valuations                                                                                                        |
-| Assistant      | Same local English/Indonesian draft parser as the website, follow-up revisions, manual review before saving                                                                       |
-| Settings       | Manage accounts, currencies, categories, custom fields, saved people and sheets; archive records; record weekly/monthly balances; sign out                                        |
+| Section   | Mobile behavior                                                                                                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview  | Cash balance, cash flow, summaries, spending breakdown, recent activity, account balances, currency summaries, activity calendar, savings goals, wealth and income/expense charts |
+| Entries   | Virtualized activity list, search/type/account filters, add/edit/delete, transfers, contributions/withdrawals, custom fields, split reimbursement claims                          |
+| Claims    | Outstanding claims, status/person filters, record a deposit, link an existing income payment, inspect and remove individual payments                                              |
+| Invest    | Portfolio estimates, contributions/withdrawals, create and edit valuations                                                                                                        |
+| Assistant | Same local English/Indonesian draft parser as the website, follow-up revisions, manual review before saving                                                                       |
+| Settings  | Manage accounts, currencies, categories, custom fields, saved people and sheets; archive records; record weekly/monthly balances; sign out                                        |
 
 All four reporting screens share A4 PDF statements through the native share sheet. Transaction exports respect active filters while preserving the full-period running balance. HTML output escapes user data. Web uses the browser print dialog. PDFs use platform fonts, so their typography differs from the website's embedded-font PDF generator.
 

@@ -176,11 +176,7 @@ export function Overview() {
             ) : (
               <Empty
                 title="No activity this period"
-                action={
-                  <Button secondary onPress={() => f.open({ type: 'entry' })}>
-                    Add entry
-                  </Button>
-                }
+                description="Record income or expenses from Entries."
               />
             )}
           </View>
@@ -188,7 +184,9 @@ export function Overview() {
         <Panel tone="mint">
           <Title>Cash by account</Title>
           {report.accounts
-            .filter((r) => !r.account.archived || r.value !== 0)
+            .filter(
+              (r) => r.account.kind !== 'investment' && (!r.account.archived || r.value !== 0),
+            )
             .map((row) => (
               <View key={row.account.id} style={styles.row}>
                 <Glyph
@@ -208,7 +206,9 @@ export function Overview() {
                 </Body>
               </View>
             ))}
-          {!report.accounts.length && (
+          {!report.accounts.some(
+            (r) => r.account.kind !== 'investment' && (!r.account.archived || r.value !== 0),
+          ) && (
             <Empty
               title="No accounts yet"
               action={
