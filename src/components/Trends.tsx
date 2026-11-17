@@ -68,10 +68,10 @@ export function Trends({
       <Panel tone="mint">
         <Title>Monthly income and expenses</Title>
         <View style={styles.row}>
-          <Body size={11} color={t.mint}>
+          <Body size={11} color={t.flowIn}>
             ● Income
           </Body>
-          <Body size={11} color={t.coral}>
+          <Body size={11} color={t.flowOut}>
             ● Expenses
           </Body>
         </View>
@@ -88,7 +88,7 @@ export function Trends({
                   style={{
                     flex: 1,
                     height: Math.max(2, (row.income / barMax) * 120),
-                    backgroundColor: t.mint,
+                    backgroundColor: t.flowIn,
                     borderTopLeftRadius: 4,
                     borderTopRightRadius: 4,
                   }}
@@ -97,7 +97,7 @@ export function Trends({
                   style={{
                     flex: 1,
                     height: Math.max(2, (row.expenses / barMax) * 120),
-                    backgroundColor: t.coral,
+                    backgroundColor: t.flowOut,
                     borderTopLeftRadius: 4,
                     borderTopRightRadius: 4,
                   }}

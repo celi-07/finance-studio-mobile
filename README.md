@@ -23,7 +23,7 @@ To override the project, copy `.env.example` to `.env.local` and supply both `EX
 
 The six destinations are **Overview, Entries, Claims, Invest, Assistant, Settings**. The floating tab bar keeps side margins and rounded selected tabs. All screens scroll without visible scroll indicators, with space reserved above the home indicator and tab bar.
 
-Reporting screens use **Filters** for period, currency and screen-specific search/type/account or claim/person filters. Current period and currency remain visible above the report. Overview has no Add entry action; record expenses and income in Entries. Claims opens a reimbursement form with full, partial and split amounts, payer and optional due date. Use the **+ beside Finance sheet** (or Settings > Finance sheets > Add) to create a business sheet; a newly created sheet becomes selected automatically.
+Reporting screens use **Filters** for period, currency and screen-specific search/type/account or claim/person filters. Current period and currency remain visible above the report. Overview has no Add entry action; record expenses and income in Entries. Claims opens a reimbursement form with full, partial and split amounts, payer and optional due date. Use **Settings > Finance sheets > Add** to create a business sheet; a newly created sheet becomes selected automatically.
 
 Sheets fade the dimmed background separately from the sliding content. Drag the header down or tap Close to dismiss. Unsaved entry and management forms offer Keep editing or Discard changes. Pickers inside sheets expand in place, avoiding stacked native modals.
 

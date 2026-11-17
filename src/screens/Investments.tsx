@@ -20,7 +20,9 @@ export function Investments() {
             <Glyph icon={TrendingUp} tone="orchid" />
             <Title>Investment estimate</Title>
           </View>
-          <Title size={34}>{money(report.invested, f.currency)}</Title>
+          <Title fit size={34}>
+            {money(report.invested, f.currency)}
+          </Title>
           <Body muted size={12}>
             Latest manually entered value plus later contributions, less withdrawals.
           </Body>
@@ -36,7 +38,9 @@ export function Investments() {
         {rows.map((row) => (
           <Panel tone="orchid" key={row.account.id}>
             <Title>{row.account.name}</Title>
-            <Title size={27}>{money(row.value, f.currency)}</Title>
+            <Title fit size={27}>
+              {money(row.value, f.currency)}
+            </Title>
             <Body muted size={12}>
               Contributed basis {money(row.basis, f.currency)}
               {row.valuation ? ' · Valued ' + row.valuation.valued_on : ' · No valuation yet'}
