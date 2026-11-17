@@ -29,11 +29,14 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { PaintedView } from './paint';
-import { Check, ChevronDown, X, type LucideIcon } from 'lucide-react-native';
+import { ItemMotionContext, useItemReveal } from './motion';
+import { Check, ChevronDown, type LucideIcon } from 'lucide-react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { alpha, blend, useRouteTone, useTheme, wash, type Tone } from './theme';
 import { fonts, shouldDismissSheet } from './layout';
+
+const MotionPaintedView = Animated.createAnimatedComponent(PaintedView);
 
 export const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -165,9 +168,11 @@ export function Panel({
   style?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
+  const motion = useItemReveal();
   const routeTone = useRouteTone();
   return (
-    <PaintedView
+    <MotionPaintedView
+      testID="reveal-surface"
       paint={paint}
       tone={tone}
       style={[
@@ -180,10 +185,11 @@ export function Panel({
           boxShadow: `inset 0 1px 0 ${t.rim}, 0 7px 20px #17284724`,
         },
         style,
+        motion,
       ]}
     >
       {children}
-    </PaintedView>
+    </MotionPaintedView>
   );
 }
 export function Glyph({
@@ -240,7 +246,7 @@ export function Button({
   label?: string;
 }) {
   const t = useTheme();
-  const color = danger ? t.danger : secondary ? t.ink : quiet ? t.accent : t.accentText;
+  const color = danger ? t.danger : secondary ? t.ink : quiet ? t.accent : t.actionText;
   return (
     <Pressable
       accessibilityRole="button"
@@ -258,8 +264,8 @@ export function Button({
           gap: 7,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: quiet ? 'transparent' : secondary ? t.surface : t.accent,
-          borderColor: secondary ? t.line : quiet ? 'transparent' : t.accent,
+          backgroundColor: quiet ? 'transparent' : secondary ? t.surface : t.action,
+          borderColor: secondary ? t.line : quiet ? 'transparent' : t.action,
           borderWidth: 1,
           opacity: disabled || busy ? 0.5 : pressed ? 0.72 : 1,
         },
@@ -353,6 +359,7 @@ export function Sheet({
   const translateY = useRef(new Animated.Value(height)).current;
   const shade = useRef(new Animated.Value(0)).current;
   const closing = useRef(false);
+  const tappedGrabber = useRef(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const reduceMotion = useRef(false);
   const latest = useRef({ locked, onClose, height, dirty });
@@ -410,16 +417,30 @@ export function Sheet({
   }, [animateDismiss, translateY]);
   const pan = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => !latest.current.locked && !closing.current,
+      onMoveShouldSetPanResponderCapture: (_, gesture) =>
+        !latest.current.locked &&
+        !closing.current &&
+        gesture.dy > 4 &&
+        gesture.dy > Math.abs(gesture.dx),
       onMoveShouldSetPanResponder: (_, gesture) =>
         !latest.current.locked &&
         !closing.current &&
-        gesture.dy > 7 &&
+        gesture.dy > 4 &&
         Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderGrant: (event) => {
+        tappedGrabber.current = event.nativeEvent.locationY < 44;
+      },
       onPanResponderMove: (_, gesture) => {
         if (!latest.current.locked) translateY.setValue(Math.max(0, gesture.dy));
       },
       onPanResponderRelease: (_, gesture) => {
-        if (!latest.current.locked && shouldDismissSheet(gesture.dy, gesture.vy)) dismiss();
+        if (
+          !latest.current.locked &&
+          (shouldDismissSheet(gesture.dy, gesture.vy) ||
+            (tappedGrabber.current && Math.abs(gesture.dy) < 5 && Math.abs(gesture.dx) < 5))
+        )
+          dismiss();
         else
           Animated.spring(translateY, {
             toValue: 0,
@@ -447,7 +468,7 @@ export function Sheet({
       />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Dismiss dialog"
+        accessibilityLabel="Dismiss backdrop"
         style={StyleSheet.absoluteFill}
         disabled={locked}
         onPress={dismiss}
@@ -472,31 +493,34 @@ export function Sheet({
             transform: [{ translateY }],
           }}
         >
-          <View {...pan.panHandlers}>
-            <View
-              accessible
-              accessibilityLabel="Drag down to close"
-              style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 2 }}
+          <View
+            {...pan.panHandlers}
+            testID="sheet-drag-region"
+            style={{ minHeight: 100, borderBottomWidth: 1, borderColor: t.line }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss dialog"
+              accessibilityHint="You can also drag this header down to close"
+              onAccessibilityTap={dismiss}
+              onPress={dismiss}
+              disabled={locked}
+              style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
             >
               <View
                 style={{ width: 42, height: 5, borderRadius: 3, backgroundColor: t.strongLine }}
               />
-            </View>
+            </Pressable>
             <View
-              style={[
-                styles.between,
-                {
-                  paddingHorizontal: 18,
-                  paddingVertical: 10,
-                  borderBottomWidth: 1,
-                  borderColor: t.line,
-                },
-              ]}
+              pointerEvents="none"
+              style={{
+                paddingHorizontal: 18,
+                paddingBottom: 18,
+                minHeight: 50,
+                justifyContent: 'center',
+              }}
             >
-              <Button quiet icon={X} onPress={dismiss} label="Close" disabled={locked} />
-              <View style={styles.grow}>
-                <Title size={21}>{title}</Title>
-              </View>
+              <Title size={21}>{title}</Title>
             </View>
           </View>
           {confirmDiscard && (
@@ -521,7 +545,9 @@ export function Sheet({
             contentContainerStyle={{ padding: 18, gap: 16 }}
           >
             <SafeAreaView edges={['bottom']}>
-              <InSheet.Provider value={true}>{children}</InSheet.Provider>
+              <ItemMotionContext.Provider value={null}>
+                <InSheet.Provider value={true}>{children}</InSheet.Provider>
+              </ItemMotionContext.Provider>
             </SafeAreaView>
           </ScrollView>
         </Animated.View>
@@ -557,6 +583,7 @@ export function Select({
             key={option.value}
             accessibilityRole="radio"
             accessibilityState={{ checked: value === option.value }}
+            aria-checked={value === option.value}
             onPress={() => {
               onChange(option.value);
               setOpen(false);
@@ -652,6 +679,7 @@ export function Segments({
           key={option.value}
           accessibilityRole="tab"
           accessibilityState={{ selected: value === option.value }}
+          aria-selected={value === option.value}
           onPress={() => onChange(option.value)}
           style={{
             flex: 1,

@@ -1,7 +1,8 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
   Animated,
   Keyboard,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -19,7 +20,7 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react-native';
-import { alpha, routeTones, useTheme } from '../ui/theme';
+import { routeTones, useTheme } from '../ui/theme';
 import { PaintedView } from '../ui/paint';
 import { useReducedMotion } from '../ui/motion';
 import { fonts, routeLabels, tabBar } from '../ui/layout';
@@ -33,40 +34,89 @@ const icons = {
   Settings: SlidersHorizontal,
 };
 type TabName = keyof typeof icons;
+const names = Object.keys(icons) as TabName[];
+function GradientLayers({
+  progress,
+  paint,
+  radius,
+}: {
+  progress: Animated.AnimatedInterpolation<number>;
+  paint: 'navigation' | 'selection';
+  radius: number;
+}) {
+  return (
+    <>
+      {names.map((name, index) => (
+        <Animated.View
+          key={name}
+          pointerEvents="none"
+          testID={`${paint}-gradient-${index}`}
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              opacity:
+                index === 0
+                  ? 1
+                  : progress.interpolate({
+                      inputRange: [index - 1, index],
+                      outputRange: [0, 1],
+                      extrapolate: 'clamp',
+                    }),
+            },
+          ]}
+        >
+          <PaintedView
+            paint={paint}
+            tone={routeTones[name]}
+            radius={radius}
+            inset={0}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      ))}
+    </>
+  );
+}
 function TabItem({
   name,
   selected,
+  highlighted,
   reduced,
+  compact,
   onPress,
   onLongPress,
-  compact,
+  setRef,
 }: {
   name: TabName;
   selected: boolean;
+  highlighted: boolean;
   reduced: boolean;
+  compact: boolean;
   onPress: () => void;
   onLongPress: () => void;
-  compact: boolean;
+  setRef: (node: ComponentRef<typeof View> | null) => void;
 }) {
   const t = useTheme(),
     Icon = icons[name];
   const [focused, setFocused] = useState(false);
-  const scale = useRef(new Animated.Value(selected ? 1.09 : 1)).current;
+  const scale = useRef(new Animated.Value(highlighted ? 1.09 : 1)).current;
   useEffect(() => {
     const animation = Animated.timing(scale, {
-      toValue: selected ? 1.09 : 1,
-      duration: reduced ? 0 : 220,
+      toValue: highlighted ? 1.09 : 1,
+      duration: reduced ? 0 : 180,
       useNativeDriver: true,
     });
     animation.start();
     return () => animation.stop();
-  }, [selected, reduced, scale]);
-  const color = selected ? t[routeTones[name]] : t.navInk;
+  }, [highlighted, reduced, scale]);
+  const color = highlighted ? t[routeTones[name]] : t.navInk;
   return (
     <Pressable
+      ref={setRef}
       accessibilityRole="tab"
       accessibilityLabel={routeLabels[name]}
       accessibilityState={{ selected }}
+      aria-selected={selected}
       testID={`tab-${name.toLowerCase()}`}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -81,8 +131,8 @@ function TabItem({
         flex: 1,
         minWidth: 0,
         zIndex: 1,
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 4,
         borderRadius: tabBar.itemRadius,
         borderWidth: 1,
@@ -92,14 +142,14 @@ function TabItem({
       })}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
-        <Icon color={color} size={20} strokeWidth={selected ? 2 : 1.65} />
+        <Icon color={color} size={20} strokeWidth={highlighted ? 2 : 1.65} />
       </Animated.View>
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={1.2}
         style={{
           color,
-          fontFamily: selected ? fonts.bold : fonts.regular,
+          fontFamily: highlighted ? fonts.bold : fonts.regular,
           fontSize: compact ? 9 : 10,
           letterSpacing: compact ? -0.25 : 0,
           lineHeight: 13,
@@ -119,12 +169,106 @@ export function StudioTabBar({ state, navigation }: BottomTabBarProps) {
     { width } = useWindowDimensions(),
     reduced = useReducedMotion();
   const [keyboard, setKeyboard] = useState(false),
-    [rowWidth, setRowWidth] = useState(0);
-  const position = useRef(new Animated.Value(0)).current,
+    [rowWidth, setRowWidth] = useState(0),
+    [preview, setPreview] = useState<number | null>(null);
+  const tabRefs = useRef<Array<ComponentRef<typeof View> | null>>([]);
+  const row = useRef<ComponentRef<typeof View>>(null),
+    rowX = useRef(0),
+    dragging = useRef(false),
     previousWidth = useRef(0);
-  const itemWidth = (rowWidth - (state.routes.length - 1) * 2) / state.routes.length;
-  const name = state.routes[state.index].name as TabName,
-    tone = routeTones[name];
+  const position = useRef(new Animated.Value(0)).current;
+  const itemWidth = Math.max(0, (rowWidth - (state.routes.length - 1) * 2) / state.routes.length),
+    slot = itemWidth + 2;
+  const progress = useMemo(
+    () =>
+      position.interpolate({
+        inputRange: [0, Math.max(1, (state.routes.length - 1) * slot)],
+        outputRange: [0, state.routes.length - 1],
+        extrapolate: 'clamp',
+      }),
+    [position, slot, state.routes.length],
+  );
+  const settle = useCallback(
+    (index: number, immediate = false) => {
+      position.stopAnimation();
+      const target = index * slot;
+      if (reduced || immediate) position.setValue(target);
+      else
+        Animated.spring(position, {
+          toValue: target,
+          stiffness: 260,
+          damping: 28,
+          mass: 1,
+          overshootClamping: true,
+          useNativeDriver: true,
+        }).start();
+    },
+    [position, reduced, slot],
+  );
+  const select = (index: number) => {
+    const route = state.routes[index];
+    if (!route) return false;
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (event.defaultPrevented) return false;
+    if (Platform.OS === 'web') tabRefs.current[index]?.focus();
+    if (state.index !== index) navigation.navigate(route.name, route.params);
+    return true;
+  };
+  const latest = useRef({
+    index: state.index,
+    count: state.routes.length,
+    slot,
+    itemWidth,
+    select,
+    settle,
+  });
+  latest.current = {
+    index: state.index,
+    count: state.routes.length,
+    slot,
+    itemWidth,
+    select,
+    settle,
+  };
+  const move = (x: number) => {
+    const current = latest.current;
+    const value = Math.max(
+      0,
+      Math.min((current.count - 1) * current.slot, x - rowX.current - current.itemWidth / 2),
+    );
+    position.setValue(value);
+    const index = Math.max(0, Math.min(current.count - 1, Math.round(value / current.slot)));
+    setPreview(index);
+    return index;
+  };
+  const moveRef = useRef(move);
+  moveRef.current = move;
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        rowX.current >= 0 && Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
+      onPanResponderGrant: (event) => {
+        dragging.current = true;
+        position.stopAnimation();
+        moveRef.current(event.nativeEvent.pageX);
+      },
+      onPanResponderMove: (event) => moveRef.current(event.nativeEvent.pageX),
+      onPanResponderRelease: (event, g) => {
+        const index = moveRef.current(event.nativeEvent.pageX);
+        dragging.current = false;
+        setPreview(null);
+        if (Math.abs(g.dy) < tabBar.height * 1.5 && latest.current.select(index))
+          latest.current.settle(index);
+        else latest.current.settle(latest.current.index);
+      },
+      onPanResponderTerminate: () => {
+        dragging.current = false;
+        setPreview(null);
+        latest.current.settle(latest.current.index);
+      },
+      onPanResponderTerminationRequest: () => false,
+    }),
+  ).current;
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
@@ -140,21 +284,10 @@ export function StudioTabBar({ state, navigation }: BottomTabBarProps) {
     };
   }, []);
   useEffect(() => {
-    position.stopAnimation();
-    const target = state.index * (itemWidth + 2);
-    if (reduced || previousWidth.current !== rowWidth) position.setValue(target);
-    else
-      Animated.spring(position, {
-        toValue: target,
-        stiffness: 260,
-        damping: 28,
-        mass: 1,
-        useNativeDriver: true,
-        overshootClamping: true,
-      }).start();
+    if (!dragging.current) settle(state.index, previousWidth.current !== rowWidth);
     previousWidth.current = rowWidth;
     return () => position.stopAnimation();
-  }, [state.index, rowWidth, itemWidth, reduced, position]);
+  }, [state.index, rowWidth, settle, position]);
   if (keyboard) return null;
   return (
     <View
@@ -167,76 +300,76 @@ export function StudioTabBar({ state, navigation }: BottomTabBarProps) {
         alignItems: 'center',
       }}
     >
-      <PaintedView
+      <View
         testID="studio-tab-bar"
-        paint="navigation"
-        tone={tone}
-        radius={tabBar.radius}
         style={{
           width: '100%',
           maxWidth: tabBar.maxWidth,
           height: tabBar.height,
           borderRadius: tabBar.radius,
-          padding: 5,
-          borderWidth: 1,
-          borderColor: t.line,
-          boxShadow: `inset 0 1px 0 ${t.rim}, 0 5px 24px #16274424`,
+          boxShadow: '0 5px 24px #16274424',
         }}
       >
         <View
-          onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
-          style={{ flex: 1, flexDirection: 'row', gap: 2 }}
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { borderRadius: tabBar.radius, overflow: 'hidden' }]}
         >
-          {itemWidth > 0 && (
-            <Animated.View
-              testID="tab-selection"
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                left: 0,
-                width: itemWidth,
-                transform: [{ translateX: position }],
-              }}
-            >
-              <PaintedView
-                paint="selection"
-                tone={tone}
-                radius={tabBar.itemRadius}
-                style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    borderRadius: tabBar.itemRadius,
-                    borderWidth: 1,
-                    borderColor: alpha(t[tone], 0.24),
-                    boxShadow: `inset 0 1px 0 ${t.rim}, 0 3px 12px #234fca0c`,
-                  },
-                ]}
-              />
-            </Animated.View>
-          )}
-          {state.routes.map((route, index) => (
-            <TabItem
-              key={route.key}
-              name={route.name as TabName}
-              selected={state.index === index}
-              reduced={reduced}
-              compact={width < 360}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (state.index !== index && !event.defaultPrevented)
-                  navigation.navigate(route.name, route.params);
-              }}
-              onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
-            />
-          ))}
+          <GradientLayers progress={progress} paint="navigation" radius={tabBar.radius} />
         </View>
-      </PaintedView>
+        <View style={{ flex: 1, padding: 6 }}>
+          <View
+            ref={row}
+            {...pan.panHandlers}
+            testID="tab-scrub-region"
+            onLayout={(event) => {
+              setRowWidth(event.nativeEvent.layout.width);
+              row.current?.measureInWindow((x) => {
+                rowX.current = x;
+              });
+            }}
+            style={{ flex: 1, flexDirection: 'row', gap: 2 }}
+          >
+            {itemWidth > 0 && (
+              <Animated.View
+                testID="tab-selection"
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: itemWidth,
+                  borderRadius: tabBar.itemRadius,
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: t.strongLine,
+                  transform: [{ translateX: position }],
+                }}
+              >
+                <GradientLayers progress={progress} paint="selection" radius={tabBar.itemRadius} />
+              </Animated.View>
+            )}
+            {state.routes.map((route, index) => (
+              <TabItem
+                key={route.key}
+                setRef={(node) => {
+                  tabRefs.current[index] = node;
+                }}
+                name={route.name as TabName}
+                selected={state.index === index}
+                highlighted={(preview ?? state.index) === index}
+                reduced={reduced}
+                compact={width < 360}
+                onPress={() => {
+                  setPreview(null);
+                  if (select(index)) settle(index);
+                }}
+                onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
     </View>
   );
 }

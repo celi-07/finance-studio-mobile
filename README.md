@@ -21,11 +21,13 @@ To override the project, copy `.env.example` to `.env.local` and supply both `EX
 
 ## Mobile navigation and forms
 
-The six destinations are **Overview, Entries, Claims, Invest, Assistant, Settings**. The floating tab bar keeps side margins and rounded selected tabs. All screens scroll without visible scroll indicators, with space reserved above the home indicator and tab bar.
+The six destinations are **Overview, Entries, Claims, Invest, Assistant, Settings**. The floating tab bar uses one full-size gradient surface and rounded rectangular selected tabs. Tap a destination or slide across the bar to preview its changing gradient and select on release; canceling a slide preserves the current tab. Headers, cards and activity rows reveal separately when switching tabs, with travel removed for Reduce Motion. All screens scroll without visible scroll indicators, with space reserved above the home indicator and tab bar.
 
-Reporting screens use **Filters** for period, currency and screen-specific search/type/account or claim/person filters. Current period and currency remain visible above the report. Overview has no Add entry action; record expenses and income in Entries. Claims opens a reimbursement form with full, partial and split amounts, payer and optional due date. Use **Settings > Finance sheets > Add** to create a business sheet; a newly created sheet becomes selected automatically.
+Reporting screens use **Filters** for period, currency and screen-specific search/type/account or claim/person filters. Current period and currency remain visible above the report. Overview has no Add entry action; record expenses and income in Entries. Claims opens a reimbursement form with full, partial and split amounts, payer and optional due date. Use **Settings > Finance sheets > Add sheet** to create a business sheet; a newly created sheet becomes selected automatically.
 
-Sheets fade the dimmed background separately from the sliding content. Drag the header down or tap Close to dismiss. Unsaved entry and management forms offer Keep editing or Discard changes. Pickers inside sheets expand in place, avoiding stacked native modals.
+Sheets fade the dimmed background separately from the sliding content. Drag anywhere in the full-width, 100-point header, tap the grabber, or tap the dimmed backdrop to dismiss. Titles align left, without an X button. Unsaved entry and management forms offer Keep editing or Discard changes. Pickers inside sheets expand in place, avoiding stacked native modals.
+
+Both the website and mobile follow the device light/dark preference; Settings shows the current mobile appearance. Mobile primary actions use a plum gradient in light appearance and lavender in dark appearance, while retaining the website palette for other surfaces.
 
 The app bundles the licensed Plus Jakarta Sans fonts and light/dark splash artwork. The branded native launch configuration requires a new installed build. Expo Go does not fully reproduce native splash screens; the React loading view displays the same identity while fonts and authentication restore. No artificial launch delay is added.
 

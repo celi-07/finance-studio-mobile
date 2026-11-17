@@ -1,4 +1,4 @@
-﻿import { useId, useState, type ReactNode } from 'react';
+﻿import { forwardRef, useId, useState, type ComponentRef, type ReactNode } from 'react';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { alpha, blend, useRouteTone, useTheme, wash, type Tone } from './theme';
@@ -44,7 +44,7 @@ function PaintLayer({
             : paint === 'selection'
               ? [blend(t.surface, tint, 0.73), tint]
               : paint === 'button'
-                ? [t.accentTop, t.accent]
+                ? [t.actionTop, t.action]
                 : paint === 'glyph'
                   ? [blend(t.surface, tint, 0.58), tint]
                   : [t.surface, blend(t.surfaceEnd, tint, 0.4)];
@@ -120,7 +120,13 @@ function PaintLayer({
             : [];
   if (width <= 0 || height <= 0) return null;
   return (
-    <Svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} aria-hidden>
+    <Svg
+      width={width}
+      height={height}
+      preserveAspectRatio="none"
+      viewBox={`0 0 ${width} ${height}`}
+      aria-hidden
+    >
       <Defs>
         <LinearGradient
           id={`${id}base`}
@@ -159,54 +165,63 @@ function PaintLayer({
     </Svg>
   );
 }
-export function PaintedView({
-  paint = 'panel',
-  tone,
-  radius = 20,
-  inset = 1,
-  children,
-  onLayout,
-  ...props
-}: ViewProps & {
+type PaintedViewProps = ViewProps & {
   paint?: Paint;
   tone?: Tone;
   radius?: number;
   inset?: number;
   children?: ReactNode;
-}) {
-  const routeTone = useRouteTone();
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  return (
-    <View
-      {...props}
-      onLayout={(event) => {
-        const { width, height } = event.nativeEvent.layout;
-        setSize((old) => (old.width === width && old.height === height ? old : { width, height }));
-        onLayout?.(event);
-      }}
-    >
+};
+export const PaintedView = forwardRef<ComponentRef<typeof View>, PaintedViewProps>(
+  function PaintedView(
+    {
+      paint = 'panel',
+      tone,
+      radius = 20,
+      inset = 1,
+      children,
+      onLayout,
+      ...props
+    }: PaintedViewProps,
+    ref,
+  ) {
+    const routeTone = useRouteTone();
+    const [size, setSize] = useState({ width: 0, height: 0 });
+    return (
       <View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            top: inset,
-            left: inset,
-            right: inset,
-            bottom: inset,
-            borderRadius: Math.max(0, radius - inset),
-            overflow: 'hidden',
-          },
-        ]}
+        {...props}
+        ref={ref}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setSize((old) =>
+            old.width === width && old.height === height ? old : { width, height },
+          );
+          onLayout?.(event);
+        }}
       >
-        <PaintLayer
-          paint={paint}
-          tone={tone ?? routeTone}
-          width={size.width - inset * 2}
-          height={size.height - inset * 2}
-        />
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              top: inset,
+              left: inset,
+              right: inset,
+              bottom: inset,
+              borderRadius: Math.max(0, radius - inset),
+              overflow: 'hidden',
+            },
+          ]}
+        >
+          <PaintLayer
+            paint={paint}
+            tone={tone ?? routeTone}
+            width={size.width - inset * 2}
+            height={size.height - inset * 2}
+          />
+        </View>
+        {children}
       </View>
-      {children}
-    </View>
-  );
-}
+    );
+  },
+);
