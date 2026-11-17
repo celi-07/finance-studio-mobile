@@ -105,7 +105,10 @@ export function Settings() {
           {!!task.error && <ErrorNote>{task.error}</ErrorNote>}
         </Panel>
         {sections.map((section) => (
-          <Panel tone="mint" key={section.collection}>
+          <Panel
+            tone={section.collection === 'categories' ? 'orchid' : 'mint'}
+            key={section.collection}
+          >
             <View style={styles.between}>
               <Title>{section.title}</Title>
               <Button

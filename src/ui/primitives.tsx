@@ -28,11 +28,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PaintedView } from './paint';
 import { Check, ChevronDown, X, type LucideIcon } from 'lucide-react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { blend, useTheme, wash, type Tone } from './theme';
+import { alpha, blend, useRouteTone, useTheme, wash, type Tone } from './theme';
 import { fonts, shouldDismissSheet } from './layout';
 
 export const styles = StyleSheet.create({
@@ -50,6 +50,7 @@ export function Body({
   color,
   style,
   lines,
+  fit,
 }: {
   children: ReactNode;
   muted?: boolean;
@@ -58,17 +59,22 @@ export function Body({
   color?: string;
   style?: any;
   lines?: number;
+  fit?: boolean;
 }) {
   const t = useTheme();
   return (
     <Text
-      numberOfLines={lines}
+      numberOfLines={fit ? 1 : lines}
+      adjustsFontSizeToFit={fit}
+      minimumFontScale={0.6}
       style={[
         {
           color: color ?? (muted ? t.muted : t.ink),
           fontSize: size,
           lineHeight: size * 1.45,
           fontFamily: bold ? fonts.bold : fonts.regular,
+          includeFontPadding: false,
+          textAlignVertical: 'center',
           flexShrink: 1,
         },
         style,
@@ -78,9 +84,30 @@ export function Body({
     </Text>
   );
 }
-export function Title({ children, size = 17 }: { children: ReactNode; size?: number }) {
+function FittedTitle({ children, size }: { children: ReactNode; size: number }) {
+  const { width } = useWindowDimensions();
+  const fitted = Math.min(
+    size,
+    (Math.min(width, 850) - 76) / Math.max(1, String(children).length * 0.65),
+  );
   return (
-    <Body bold size={size} style={{ letterSpacing: -0.5 }}>
+    <Body bold fit size={fitted} style={{ letterSpacing: -0.5, lineHeight: fitted * 1.2 }}>
+      {children}
+    </Body>
+  );
+}
+export function Title({
+  children,
+  size = 17,
+  fit,
+}: {
+  children: ReactNode;
+  size?: number;
+  fit?: boolean;
+}) {
+  if (fit) return <FittedTitle size={size}>{children}</FittedTitle>;
+  return (
+    <Body bold size={size} style={{ letterSpacing: -0.5, lineHeight: size * 1.2 }}>
       {children}
     </Body>
   );
@@ -128,33 +155,35 @@ export function Brand() {
 }
 export function Panel({
   children,
-  tone = 'blue',
+  tone,
+  paint = 'panel',
   style,
 }: {
   children: ReactNode;
   tone?: Tone;
+  paint?: 'panel' | 'cash';
   style?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
+  const routeTone = useRouteTone();
   return (
-    <LinearGradient
-      colors={[t.surface, blend(t.surfaceEnd, wash(t, tone), 0.54)]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <PaintedView
+      paint={paint}
+      tone={tone}
       style={[
         {
           borderRadius: 20,
           padding: 17,
           gap: 14,
           borderWidth: 1,
-          borderColor: blend(t.strongLine, wash(t, tone), 0.5),
-          boxShadow: '0 5px 18px #17284716',
+          borderColor: blend(t.strongLine, wash(t, tone ?? routeTone), 0.36),
+          boxShadow: `inset 0 1px 0 ${t.rim}, 0 7px 20px #17284724`,
         },
         style,
       ]}
     >
       {children}
-    </LinearGradient>
+    </PaintedView>
   );
 }
 export function Glyph({
@@ -168,20 +197,23 @@ export function Glyph({
 }) {
   const t = useTheme();
   return (
-    <LinearGradient
-      colors={[blend(t.surface, wash(t, tone), 0.6), wash(t, tone)]}
+    <PaintedView
+      paint="glyph"
+      tone={tone}
+      radius={12}
       style={{
         width: 40,
+        flexShrink: 0,
         height: 40,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: blend(t.strongLine, wash(t, tone), 0.65),
+        borderColor: alpha(t[tone], 0.19),
       }}
     >
-      <Icon size={size} color={t[tone]} strokeWidth={1.7} />
-    </LinearGradient>
+      <Icon size={size} color={t[tone]} strokeWidth={1.7} style={{ zIndex: 1 }} />
+    </PaintedView>
   );
 }
 export function Button({
@@ -227,17 +259,25 @@ export function Button({
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: quiet ? 'transparent' : secondary ? t.surface : t.accent,
-          borderColor: secondary ? t.line : 'transparent',
+          borderColor: secondary ? t.line : quiet ? 'transparent' : t.accent,
           borderWidth: 1,
           opacity: disabled || busy ? 0.5 : pressed ? 0.72 : 1,
         },
         style,
       ]}
     >
+      {!secondary && !quiet && (
+        <PaintedView
+          pointerEvents="none"
+          paint="button"
+          radius={12}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       {busy ? (
         <ActivityIndicator size="small" color={color} />
       ) : Icon ? (
-        <Icon size={17} color={color} />
+        <Icon size={17} color={color} style={{ zIndex: 1 }} />
       ) : null}
       {!!children && (
         <Body size={13} bold color={color}>
@@ -271,7 +311,7 @@ export function Input({
             borderWidth: 1,
             borderColor: error ? t.danger : t.strongLine,
             borderRadius: 11,
-            backgroundColor: t.control,
+            backgroundColor: t.hover,
             color: t.ink,
             paddingHorizontal: 12,
             paddingVertical: 10,

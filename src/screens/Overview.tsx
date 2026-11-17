@@ -11,12 +11,14 @@ import {
   Wallet,
 } from 'lucide-react-native';
 import { activity, balances, money, periodReport, today } from '../domain/ledger';
+import { PaintedView } from '../ui/paint';
 import { Page } from '../components/Page';
 import { ActivityRow } from '../components/ActivityRow';
 import { Trends } from '../components/Trends';
 import { ActivityCalendar } from '../components/ActivityCalendar';
 import { useReport } from '../state/finance';
 import { Body, Button, Empty, Glyph, Panel, Title, styles } from '../ui/primitives';
+import palette from '../ui/website-palette.json';
 import { useTheme, type Tone } from '../ui/theme';
 
 export function Overview() {
@@ -70,18 +72,20 @@ export function Overview() {
                   <Button quiet onPress={() => f.setCurrency(currency)}>
                     {currency}
                   </Button>
-                  <Title>{money(r.cash, currency)}</Title>
+                  <Title fit>{money(r.cash, currency)}</Title>
                 </View>
               );
             })}
           </Panel>
         )}
-        <Panel tone="orchid">
+        <Panel paint="cash" tone="orchid">
           <View style={styles.row}>
             <Glyph icon={Wallet} tone="orchid" />
             <Body bold>Cash balance</Body>
           </View>
-          <Title size={35}>{format(report.cash)}</Title>
+          <Title fit size={35}>
+            {format(report.cash)}
+          </Title>
           <Body muted size={12}>
             Across your cash accounts at the reporting date
           </Body>
@@ -107,25 +111,29 @@ export function Overview() {
         <Panel tone="mint">
           <Title>Period summary</Title>
           {metrics.map((metric) => (
-            <View
+            <PaintedView
+              paint="summary"
+              tone={metric.tone}
+              radius={12}
+              inset={0}
               key={metric.title}
-              style={{ gap: 5, borderTopWidth: 1, borderColor: t.line, paddingTop: 12 }}
+              style={{ gap: 5, padding: 10, borderRadius: 12 }}
             >
               <View style={styles.between}>
-                <View style={styles.row}>
+                <View style={[styles.row, styles.grow]}>
                   <Glyph icon={metric.icon} tone={metric.tone} />
                   <Body bold size={13}>
                     {metric.title}
                   </Body>
                 </View>
-                <Body bold size={14}>
+                <Body bold size={14} color={t[metric.tone]} style={{ flexShrink: 0 }}>
                   {format(metric.amount)}
                 </Body>
               </View>
               <Body muted size={11}>
                 {metric.hint}
               </Body>
-            </View>
+            </PaintedView>
           ))}
         </Panel>
         <Panel tone="amber">
@@ -134,7 +142,7 @@ export function Overview() {
             Excludes amounts owed to you
           </Body>
           {report.categories.length ? (
-            report.categories.map((row, i) => (
+            report.categories.map((row) => (
               <View key={row.id ?? ''} style={{ gap: 7 }}>
                 <View style={styles.between}>
                   <Body size={13}>{row.name}</Body>
@@ -147,7 +155,11 @@ export function Overview() {
                     style={{
                       width: `${Math.min(100, (row.amount / Math.max(1, report.spending)) * 100)}%`,
                       height: 7,
-                      backgroundColor: [t.mint, t.blue, t.orchid, t.coral, t.amber][i % 5],
+                      backgroundColor:
+                        palette.categories[
+                          (f.workspace.categories.find((c) => c.id === row.id)?.color ??
+                            'slate') as keyof typeof palette.categories
+                        ] ?? palette.categories.slate,
                       borderRadius: 6,
                     }}
                   />
@@ -231,7 +243,7 @@ export function Overview() {
           </Body>
           <View style={styles.between}>
             <Body>Available to spend</Body>
-            <Title>{format(current - reserved)}</Title>
+            <Title fit>{format(current - reserved)}</Title>
           </View>
           {goals.map((goal) => (
             <View

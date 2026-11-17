@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PaintedView } from '../ui/paint';
 import { StudioMark } from '../ui/primitives';
 import { fonts } from '../ui/layout';
 import { useTheme } from '../ui/theme';
@@ -7,10 +7,10 @@ import { useTheme } from '../ui/theme';
 export function BrandedSplash({ fontsReady = true }: { fontsReady?: boolean }) {
   const t = useTheme();
   return (
-    <LinearGradient
-      colors={[t.dark ? '#352954' : '#ddd1f7', t.canvas, t.dark ? '#194044' : '#d0ebe6']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <PaintedView
+      paint="canvas"
+      radius={0}
+      inset={0}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18 }}
     >
       <View
@@ -39,6 +39,6 @@ export function BrandedSplash({ fontsReady = true }: { fontsReady?: boolean }) {
           Your money, in perspective.
         </Text>
       </View>
-    </LinearGradient>
+    </PaintedView>
   );
 }

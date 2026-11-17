@@ -63,7 +63,7 @@ export function Assistant() {
         {current && (
           <Panel tone="amber">
             <Title>Review your draft</Title>
-            <Title size={27}>
+            <Title fit size={27}>
               {money(parseMoney(current.draft.amount, current.currency) ?? 0, current.currency)}
             </Title>
             <Body bold>{current.draft.description || 'Add a description'}</Body>

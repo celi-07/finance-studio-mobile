@@ -68,7 +68,9 @@ export function Reimbursements() {
             <Glyph icon={HandCoins} tone="amber" />
             <Title>Outstanding</Title>
           </View>
-          <Title size={32}>{money(report.outstanding, f.currency)}</Title>
+          <Title fit size={32}>
+            {money(report.outstanding, f.currency)}
+          </Title>
           <View style={styles.between}>
             <Body muted size={12}>
               New claims {money(report.newClaims, f.currency)}
@@ -93,7 +95,9 @@ export function Reimbursements() {
             </View>
             <View style={styles.between}>
               <Body muted>Remaining</Body>
-              <Title size={22}>{money(row.remaining, f.currency)}</Title>
+              <Title fit size={22}>
+                {money(row.remaining, f.currency)}
+              </Title>
             </View>
             <Body muted size={12}>
               {money(row.paid, f.currency)} received of {money(row.amount_minor, f.currency)}

@@ -22,7 +22,7 @@ export function ActivityCalendar({
   const offset = (first.getUTCDay() + 6) % 7;
   const count = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
   return (
-    <Panel tone="blue">
+    <Panel tone="coral">
       <Title>Activity calendar</Title>
       <Body muted size={12}>
         Tap a date to see its entries · {currency}

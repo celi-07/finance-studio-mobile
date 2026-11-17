@@ -199,7 +199,7 @@ function EntryForm({ editor }: { editor: Extract<Editor, { type: 'entry' }> }) {
         {field('amount', 'Amount (' + currency + ')', {
           keyboardType: 'decimal-pad',
           placeholder: amountExample(currency),
-          style: { fontSize: 28, fontWeight: '600' },
+          style: { fontSize: 28 },
         })}
         {field('occurred_on', 'Date', { placeholder: 'YYYY-MM-DD', autoCapitalize: 'none' })}
         <Select

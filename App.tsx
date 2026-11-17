@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 import { routeLabels } from './src/ui/layout';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PaintedView } from './src/ui/paint';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
@@ -76,12 +76,7 @@ function Root({ fontsReady }: { fontsReady: boolean }) {
   }, [fontsReady, auth.ready]);
   if (!fontsReady || !auth.ready) return <BrandedSplash fontsReady={fontsReady} />;
   return (
-    <LinearGradient
-      colors={[t.dark ? '#352954' : '#ddd1f7', t.canvas, t.dark ? '#194044' : '#d0ebe6']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1 }}
-    >
+    <PaintedView paint="canvas" radius={0} inset={0} style={{ flex: 1, backgroundColor: t.canvas }}>
       <StatusBar style={t.dark ? 'light' : 'dark'} />
       {auth.demo || auth.verified ? (
         <WorkspaceProvider key={auth.demo ? 'demo' : auth.session!.user.id}>
@@ -92,7 +87,7 @@ function Root({ fontsReady }: { fontsReady: boolean }) {
       ) : (
         <AuthScreen />
       )}
-    </LinearGradient>
+    </PaintedView>
   );
 }
 export default function App() {
