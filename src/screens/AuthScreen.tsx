@@ -23,6 +23,8 @@ import {
   useSubmission,
 } from '../ui/primitives';
 
+type AuthAction = 'google' | 'apple' | 'sign-in' | 'verify' | 'send-code' | 'sign-out' | 'website';
+
 export function AuthScreen() {
   const auth = useAuth();
   const [email, setEmail] = useState('');
@@ -31,6 +33,17 @@ export function AuthScreen() {
   const [sentTo, setSentTo] = useState('');
   const [passwordMode, setPasswordMode] = useState(true);
   const task = useSubmission();
+  const [activeAction, setActiveAction] = useState<AuthAction | null>(null);
+  function run(action: AuthAction, operation: () => Promise<void>) {
+    return task.run(async () => {
+      setActiveAction(action);
+      try {
+        await operation();
+      } finally {
+        setActiveAction(null);
+      }
+    });
+  }
   const [retryAfter, setRetryAfter] = useState(0);
   const pendingEmail = auth.session?.user.email ?? sentTo;
   const verifying = !!auth.session || !!sentTo;
@@ -94,9 +107,10 @@ export function AuthScreen() {
                     maxLength={10}
                   />
                   <Button
-                    busy={task.busy}
+                    busy={activeAction === 'verify'}
+                    disabled={task.busy}
                     onPress={() =>
-                      task.run(async () => {
+                      run('verify', async () => {
                         if (!/^\d{6,10}$/.test(code.trim()))
                           throw Error('Enter the code from your email.');
                         const { error } = await auth.client!.auth.verifyOtp({
@@ -113,14 +127,20 @@ export function AuthScreen() {
                   >
                     Verify and continue
                   </Button>
-                  <Button secondary disabled={task.busy} onPress={() => task.run(send)}>
+                  <Button
+                    secondary
+                    busy={activeAction === 'send-code'}
+                    disabled={task.busy}
+                    onPress={() => run('send-code', send)}
+                  >
                     {sentTo ? 'Resend code' : 'Send verification code'}
                   </Button>
                   <Button
                     quiet
+                    busy={activeAction === 'sign-out'}
                     disabled={task.busy}
                     onPress={() =>
-                      task.run(async () => {
+                      run('sign-out', async () => {
                         await auth.signOut();
                         setSentTo('');
                         setCode('');
@@ -156,9 +176,9 @@ export function AuthScreen() {
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel="Continue with Google"
-                      accessibilityState={{ disabled: task.busy, busy: task.busy }}
+                      accessibilityState={{ disabled: task.busy, busy: activeAction === 'google' }}
                       disabled={task.busy}
-                      onPress={() => task.run(() => auth.oauth('google'))}
+                      onPress={() => run('google', () => auth.oauth('google'))}
                       style={({ pressed }) => ({
                         minHeight: 50,
                         paddingHorizontal: 16,
@@ -173,7 +193,7 @@ export function AuthScreen() {
                         opacity: task.busy ? 0.5 : pressed ? 0.75 : 1,
                       })}
                     >
-                      {task.busy ? (
+                      {activeAction === 'google' ? (
                         <ActivityIndicator color="#1f1f1f" size="small" />
                       ) : (
                         <GoogleMark />
@@ -188,16 +208,18 @@ export function AuthScreen() {
                     <Button
                       secondary
                       disabled={task.busy}
-                      onPress={() => task.run(() => auth.oauth('apple'))}
+                      busy={activeAction === 'apple'}
+                      onPress={() => run('apple', () => auth.oauth('apple'))}
                     >
                       Continue with Apple
                     </Button>
                   )}
                   <Button
                     icon={ArrowRight}
-                    busy={task.busy}
+                    busy={activeAction === 'sign-in'}
+                    disabled={task.busy}
                     onPress={() =>
-                      task.run(async () => {
+                      run('sign-in', async () => {
                         if (!passwordMode) return send();
                         if (!/^\S+@\S+\.\S+$/.test(email.trim()))
                           throw Error('Enter your email address.');
@@ -226,9 +248,10 @@ export function AuthScreen() {
               {!verifying && auth.client && (
                 <Button
                   quiet
+                  busy={activeAction === 'website'}
                   disabled={task.busy}
                   onPress={() =>
-                    task.run(async () => {
+                    run('website', async () => {
                       await WebBrowser.openBrowserAsync('https://finance-studio.whiteeorangee.com');
                     })
                   }
