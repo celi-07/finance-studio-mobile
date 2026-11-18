@@ -3,6 +3,7 @@
 Native React Native + Expo companion to [Finance Studio](https://finance-studio.whiteeorangee.com/), ported from [celi-07/finance-studio](https://github.com/celi-07/finance-studio) at `189b5f77cfa9c3a6250b89575d27fb836a12a613`.
 
 The app preserves the website's logo, pastel gradients, rounded panels, route colors, six navigation sections, light/dark themes, financial calculations, validation, 20 currencies, and Asia/Jakarta reporting dates. The interface uses native components, not a WebVie
+
 ## Product tour
 
 [![Watch the 80-second Finance Studio web and mobile product tour](https://finance-studio.whiteeorangee.com/product-tour/poster.jpg)](https://finance-studio.whiteeorangee.com/#product-tour)
