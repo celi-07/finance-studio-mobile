@@ -41,13 +41,22 @@
           "image": "./assets/splash-light.png",
           "imageWidth": 280,
           "resizeMode": "contain",
-          "dark": { "backgroundColor": "#10141f", "image": "./assets/splash-dark.png" }
+          "dark": {
+            "backgroundColor": "#10141f",
+            "image": "./assets/splash-dark.png"
+          }
         }
       ]
     ],
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "33ec4134-bc83-4dc7-bed4-73dcb07448fc"
+      }
+    },
+    "owner": "celi-07"
   }
 }
